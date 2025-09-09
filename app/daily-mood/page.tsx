@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Heart, Calendar, Smile, Meh, Frown } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { createMoodRecord } from '@/lib/firebase-service'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function DailyMoodPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [mood, setMood] = useState('')
   const [note, setNote] = useState('')
   const [selectedMood, setSelectedMood] = useState('')
@@ -23,32 +26,27 @@ export default function DailyMoodPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedMood) return
+    if (!user?.uid) {
+      alert('로그인이 필요합니다.')
+      router.push('/login')
+      return
+    }
 
     setIsSubmitting(true)
     try {
-      // 마음 기록 API 호출
-      const response = await fetch('/api/mood-records', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mood: selectedMood === 'happy' ? 8 : selectedMood === 'neutral' ? 5 : 2,
-          note: note || mood,
-          activities: [],
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save mood record')
+      const moodData = {
+        userId: user.uid,
+        mood: selectedMood === 'happy' ? 8 : selectedMood === 'neutral' ? 5 : 2,
+        note: note || mood,
+        activities: [],
       }
 
-      const result = await response.json()
+      const result = await createMoodRecord(moodData)
       console.log('마음 기록 저장 성공:', result)
       
-      // 성공 시 홈으로 이동
+      // 성공 시 저널 > 마음 탭으로 이동
       setTimeout(() => {
-        router.push('/')
+        router.push('/journal?tab=mood')
       }, 1000)
     } catch (error) {
       console.error('Error saving mood:', error)

@@ -108,18 +108,6 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
         </div>
       </nav>
 
-      {/* 로그아웃 버튼 (설정 페이지에서만 표시) */}
-      {pathname === '/settings' && (
-        <div className="fixed top-4 right-4 z-50">
-          <button
-            onClick={handleLogout}
-            className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-            title="로그아웃"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-      )}
     </div>
   )
 }

@@ -6,14 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { checkEmailExists, generateVerificationCode, verifyCode } from '@/lib/auth'
+import { checkEmailExists, generateVerificationCode, verifyCode, sendVerificationEmail } from '@/lib/auth'
+import { auth } from '@/lib/firebase'
 
 interface EmailFindModalProps {
   isOpen: boolean
   onClose: () => void
+  mode: 'email-find' | 'password-reset' // 이메일 찾기 또는 비밀번호 찾기 모드
 }
 
-export default function EmailFindModal({ isOpen, onClose }: EmailFindModalProps) {
+export default function EmailFindModal({ isOpen, onClose, mode }: EmailFindModalProps) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
@@ -35,19 +37,40 @@ export default function EmailFindModal({ isOpen, onClose }: EmailFindModalProps)
     setError('')
 
     try {
+      console.log('Checking email existence for:', email)
+      console.log('Firebase auth available:', !!auth)
+      
       // Firebase에서 이메일 존재 여부 확인
       const emailExists = await checkEmailExists(email)
+      console.log('Email exists result:', emailExists)
       
       if (emailExists) {
-        // 인증번호 생성 및 저장 (실제로는 서버에서 이메일 발송)
-        const verificationCode = generateVerificationCode()
-        setStoredVerificationCode(verificationCode)
-        
-        // TODO: 실제 이메일 발송 로직 (서버에서 처리)
-        console.log('인증번호:', verificationCode) // 개발용 로그
-        
-        setSuccess('인증번호가 발송되었습니다.')
-        setStep('verification')
+        if (mode === 'email-find') {
+          // 이메일 찾기: 인증번호 생성 및 표시
+          const emailResult = await sendVerificationEmail(email)
+          
+          if (emailResult.success && emailResult.verificationCode) {
+            setStoredVerificationCode(emailResult.verificationCode)
+            setSuccess('인증번호가 생성되었습니다. 아래 인증번호를 확인해주세요.')
+            setStep('verification')
+          } else {
+            setError(`인증번호 생성 실패: ${emailResult.error}`)
+          }
+        } else {
+          // 비밀번호 찾기: 비밀번호 재설정 이메일 발송
+          const { sendPasswordReset } = await import('@/lib/auth')
+          const result = await sendPasswordReset(email)
+          
+          if (result.error) {
+            setError(`비밀번호 재설정 이메일 발송 실패: ${result.error}`)
+          } else {
+            setSuccess('비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.')
+            // 비밀번호 찾기는 이메일 발송 후 완료
+            setTimeout(() => {
+              onClose()
+            }, 2000)
+          }
+        }
       } else {
         setError('가입된 이메일이 없습니다.')
       }
@@ -119,14 +142,14 @@ export default function EmailFindModal({ isOpen, onClose }: EmailFindModalProps)
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center">
-            {step === 'email' && '이메일 찾기'}
-            {step === 'verification' && '인증번호 입력'}
-            {step === 'result' && '이메일 확인'}
-          </DialogTitle>
+                  <DialogTitle className="text-center">
+          {step === 'email' && (mode === 'email-find' ? '이메일 찾기' : '비밀번호 찾기')}
+          {step === 'verification' && '인증번호 입력'}
+          {step === 'result' && '이메일 확인'}
+        </DialogTitle>
         </DialogHeader>
 
-        {step === 'email' && (
+                {step === 'email' && (
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="findEmail" className="text-sm font-medium">
@@ -144,11 +167,23 @@ export default function EmailFindModal({ isOpen, onClose }: EmailFindModalProps)
                   required
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                {mode === 'email-find' 
+                  ? '가입 시 사용한 이메일을 입력하면 인증 이메일이 발송됩니다.' 
+                  : '가입 시 사용한 이메일을 입력하면 비밀번호 재설정 이메일이 발송됩니다.'}
+              </p>
             </div>
 
             {error && (
               <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="text-green-600 text-sm bg-green-50 p-3 rounded-md flex items-center space-x-2">
+                <CheckCircle className="w-4 h-4" />
+                <span>{success}</span>
               </div>
             )}
 
@@ -175,6 +210,18 @@ export default function EmailFindModal({ isOpen, onClose }: EmailFindModalProps)
               <label htmlFor="verificationCode" className="text-sm font-medium">
                 인증번호
               </label>
+              
+              {/* 생성된 인증번호 표시 */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                <p className="text-xs text-blue-600 mb-2">생성된 인증번호</p>
+                <p className="text-2xl font-bold text-blue-800 tracking-widest">
+                  {storedVerificationCode}
+                </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  이 인증번호를 입력해주세요
+                </p>
+              </div>
+              
               <Input
                 id="verificationCode"
                 type="text"
@@ -186,7 +233,7 @@ export default function EmailFindModal({ isOpen, onClose }: EmailFindModalProps)
                 required
               />
               <p className="text-xs text-muted-foreground">
-                {email}로 발송된 인증번호를 입력해주세요.
+                위에 표시된 인증번호를 입력해주세요.
               </p>
             </div>
 
@@ -273,3 +320,4 @@ export default function EmailFindModal({ isOpen, onClose }: EmailFindModalProps)
     </Dialog>
   )
 }
+

@@ -27,12 +27,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = subscribeToAuthChanges((user) => {
-      setUser(user)
-      setLoading(false)
-    })
+    try {
+      const unsubscribe = subscribeToAuthChanges((user) => {
+        setUser(user)
+        setLoading(false)
+      })
 
-    return () => unsubscribe()
+      return () => unsubscribe()
+    } catch (error) {
+      console.warn('Firebase not configured, using mock auth state')
+      // Firebase가 설정되지 않은 경우 기본 상태로 설정
+      setUser(null)
+      setLoading(false)
+    }
   }, [])
 
   return (

@@ -1,11 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Camera, Save, Tag, X, Upload, Mic, MicOff, Play, Square } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { createSnap } from '@/lib/firebase-service'
+import { useAuth } from '@/contexts/AuthContext'
+import { logPageView, logUserActivity, ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from '@/lib/analytics'
 
 // Web Speech API 타입 정의
 declare global {
@@ -17,6 +20,7 @@ declare global {
 
 export default function CapturePage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -35,6 +39,15 @@ export default function CapturePage() {
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcriptionText, setTranscriptionText] = useState('')
   const [transcriptionProgress, setTranscriptionProgress] = useState('')
+
+  // 페이지 뷰 로깅
+  useEffect(() => {
+    if (user?.uid) {
+      logPageView(user.uid, 'capture', {
+        timestamp: new Date().toISOString()
+      })
+    }
+  }, [user])
 
   const handleTakePhoto = async () => {
     try {
@@ -207,8 +220,29 @@ export default function CapturePage() {
   // 음성 녹음 시작
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
+      // 더 안정적인 오디오 설정
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100
+        }
+      })
+      
+      // 지원되는 MIME 타입 확인
+      let mimeType = 'audio/webm'
+      if (!MediaRecorder.isTypeSupported('audio/webm')) {
+        if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4'
+        } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+          mimeType = 'audio/wav'
+        } else {
+          mimeType = 'audio/webm' // 기본값
+        }
+      }
+      
+      const recorder = new MediaRecorder(stream, { mimeType })
       const chunks: Blob[] = []
       
       recorder.ondataavailable = (e) => {
@@ -217,23 +251,6 @@ export default function CapturePage() {
         }
       }
       
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/wav' })
-        const url = URL.createObjectURL(blob)
-        setAudioBlob(blob)
-        setAudioUrl(url)
-        setRecordingTime(0)
-        stream.getTracks().forEach(track => track.stop())
-        
-        // 녹음 완료 후 자동으로 음성-텍스트 변환 시작
-        transcribeAudio(blob)
-      }
-      
-      recorder.start()
-      setMediaRecorder(recorder)
-      setIsRecording(true)
-      setRecordingTime(0)
-      
       // 녹음 시간 카운터
       const timer = setInterval(() => {
         setRecordingTime(prev => prev + 1)
@@ -241,15 +258,32 @@ export default function CapturePage() {
       
       recorder.onstop = () => {
         clearInterval(timer)
-        const blob = new Blob(chunks, { type: 'audio/wav' })
+        const blob = new Blob(chunks, { type: mimeType })
         const url = URL.createObjectURL(blob)
         setAudioBlob(blob)
         setAudioUrl(url)
         setRecordingTime(0)
         stream.getTracks().forEach(track => track.stop())
         
-        // 녹음 완료 후 자동으로 음성-텍스트 변환 시작
-        transcribeAudio(blob)
+        // 녹음 완료 후 바로 음성 인식 시작 (간단한 방식)
+        startSimpleSpeechRecognition()
+      }
+      
+      recorder.start()
+      setMediaRecorder(recorder)
+      setIsRecording(true)
+      setRecordingTime(0)
+      
+      // 녹음 시작 로깅
+      if (user?.uid) {
+        await logUserActivity(
+          user.uid,
+          ACTIVITY_ACTIONS.START_RECORDING,
+          ACTIVITY_CATEGORIES.CAPTURE,
+          {
+            timestamp: new Date().toISOString()
+          }
+        )
       }
     } catch (error) {
       console.error('음성 녹음을 시작할 수 없습니다:', error)
@@ -258,10 +292,23 @@ export default function CapturePage() {
   }
 
   // 음성 녹음 중지
-  const stopRecording = () => {
+  const stopRecording = async () => {
     if (mediaRecorder && isRecording) {
       mediaRecorder.stop()
       setIsRecording(false)
+      
+      // 녹음 중지 로깅
+      if (user?.uid) {
+        await logUserActivity(
+          user.uid,
+          ACTIVITY_ACTIONS.STOP_RECORDING,
+          ACTIVITY_CATEGORIES.CAPTURE,
+          {
+            recordingDuration: recordingTime,
+            timestamp: new Date().toISOString()
+          }
+        )
+      }
     }
   }
 
@@ -307,70 +354,15 @@ export default function CapturePage() {
     setTranscriptionProgress('음성을 텍스트로 변환 중...')
 
     try {
-      // 오디오 파일을 FormData로 변환하여 서버로 전송
-      const formData = new FormData()
-      formData.append('audio', audioBlob, 'recording.wav')
+      // 오디오 파일 크기 확인
+      if (audioBlob.size === 0) {
+        throw new Error('녹음된 오디오 데이터가 없습니다.')
+      }
 
-      // 음성 인식 API 호출 (Google Cloud Speech-to-Text 또는 유사한 서비스 사용)
-      // 여기서는 클라이언트 사이드 Web Speech API를 사용
-      
-      // 오디오를 AudioContext로 재생하여 실시간 음성 인식
-      const audioContext = new AudioContext()
-      const arrayBuffer = await audioBlob.arrayBuffer()
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-      
-      // Web Speech API를 사용한 음성 인식
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      const recognition = new SpeechRecognition()
-      
-      recognition.lang = 'ko-KR' // 한국어 설정
-      recognition.continuous = false
-      recognition.interimResults = false
-      recognition.maxAlternatives = 1
-      
-      // 오디오를 재생하면서 음성 인식
-      const source = audioContext.createBufferSource()
-      source.buffer = audioBuffer
-      source.connect(audioContext.destination)
-      
-      recognition.onstart = () => {
-        setTranscriptionProgress('음성 인식 중...')
-        source.start(0)
-      }
-      
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript
-        setTranscriptionText(transcript)
-        setTranscriptionProgress('변환 완료!')
-        
-        // 메모 영역에 변환된 텍스트 추가
-        setNote(prev => {
-          const separator = prev.trim() ? '\n\n' : ''
-          return prev + separator + `🎤 음성 메모: ${transcript}`
-        })
-      }
-      
-      recognition.onerror = (event) => {
-        console.error('음성 인식 오류:', event.error)
-        setTranscriptionProgress('음성 인식 실패')
-        
-        // 오류 시 수동 입력 안내
-        const manualText = prompt('음성 인식에 실패했습니다. 직접 입력해주세요:')
-        if (manualText) {
-          setTranscriptionText(manualText)
-          setNote(prev => {
-            const separator = prev.trim() ? '\n\n' : ''
-            return prev + separator + `🎤 음성 메모: ${manualText}`
-          })
-        }
-      }
-      
-      recognition.onend = () => {
-        setIsTranscribing(false)
-        source.stop()
-      }
-      
-      recognition.start()
+      console.log('Audio blob size:', audioBlob.size, 'type:', audioBlob.type)
+
+      // 간단한 직접 음성 인식 방식 사용
+      await startDirectSpeechRecognition()
       
     } catch (error) {
       console.error('음성-텍스트 변환 오류:', error)
@@ -389,36 +381,178 @@ export default function CapturePage() {
     }
   }
 
+  // 간단한 음성 인식 (녹음 완료 후 바로 시작)
+  const startSimpleSpeechRecognition = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('이 브라우저는 음성 인식을 지원하지 않습니다.')
+      return
+    }
+
+    setIsTranscribing(true)
+    setTranscriptionProgress('음성 인식 중... (다시 말씀해주세요)')
+
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognition = new SpeechRecognition()
+      
+      recognition.lang = 'ko-KR'
+      recognition.continuous = false
+      recognition.interimResults = false
+      recognition.maxAlternatives = 1
+      
+      recognition.onstart = () => {
+        console.log('음성 인식 시작됨')
+        setTranscriptionProgress('음성 인식 중...')
+      }
+      
+      recognition.onresult = async (event) => {
+        console.log('음성 인식 결과:', event.results)
+        const transcript = event.results[0][0].transcript
+        console.log('인식된 텍스트:', transcript)
+        
+        setTranscriptionText(transcript)
+        setTranscriptionProgress('변환 완료!')
+        
+        // 음성-텍스트 변환 성공 로깅
+        if (user?.uid) {
+          await logUserActivity(
+            user.uid,
+            ACTIVITY_ACTIONS.SPEECH_TO_TEXT,
+            ACTIVITY_CATEGORIES.CAPTURE,
+            {
+              transcriptLength: transcript.length,
+              success: true,
+              timestamp: new Date().toISOString()
+            }
+          )
+        }
+        
+        // 메모 영역에 변환된 텍스트 추가
+        setNote(prev => {
+          const separator = prev.trim() ? '\n\n' : ''
+          const newText = prev + separator + `🎤 음성 메모: ${transcript}`
+          console.log('메모에 추가된 텍스트:', newText)
+          return newText
+        })
+      }
+      
+      recognition.onerror = (event) => {
+        console.error('음성 인식 오류:', event.error)
+        setTranscriptionProgress('음성 인식 실패')
+        
+        const manualText = prompt('음성 인식에 실패했습니다. 직접 입력해주세요:')
+        if (manualText) {
+          setTranscriptionText(manualText)
+          setNote(prev => {
+            const separator = prev.trim() ? '\n\n' : ''
+            return prev + separator + `🎤 음성 메모: ${manualText}`
+          })
+        }
+      }
+      
+      recognition.onend = () => {
+        console.log('음성 인식 종료됨')
+        setIsTranscribing(false)
+      }
+      
+      console.log('음성 인식 시작 중...')
+      recognition.start()
+    } catch (error) {
+      console.error('음성 인식 오류:', error)
+      setIsTranscribing(false)
+      setTranscriptionProgress('음성 인식 실패')
+    }
+  }
+
+  // 직접 음성 인식 (오디오 재생 없이)
+  const startDirectSpeechRecognition = async () => {
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognition = new SpeechRecognition()
+      
+      recognition.lang = 'ko-KR'
+      recognition.continuous = false
+      recognition.interimResults = false
+      recognition.maxAlternatives = 1
+      
+      recognition.onstart = () => {
+        setTranscriptionProgress('음성 인식 중... (다시 말씀해주세요)')
+        console.log('음성 인식 시작됨')
+      }
+      
+      recognition.onresult = (event) => {
+        console.log('음성 인식 결과:', event.results)
+        const transcript = event.results[0][0].transcript
+        console.log('인식된 텍스트:', transcript)
+        
+        setTranscriptionText(transcript)
+        setTranscriptionProgress('변환 완료!')
+        
+        // 메모 영역에 변환된 텍스트 추가
+        setNote(prev => {
+          const separator = prev.trim() ? '\n\n' : ''
+          const newText = prev + separator + `🎤 음성 메모: ${transcript}`
+          console.log('메모에 추가된 텍스트:', newText)
+          return newText
+        })
+      }
+      
+      recognition.onerror = (event) => {
+        console.error('직접 음성 인식 오류:', event.error)
+        setTranscriptionProgress('음성 인식 실패')
+        
+        const manualText = prompt('음성 인식에 실패했습니다. 직접 입력해주세요:')
+        if (manualText) {
+          setTranscriptionText(manualText)
+          setNote(prev => {
+            const separator = prev.trim() ? '\n\n' : ''
+            return prev + separator + `🎤 음성 메모: ${manualText}`
+          })
+        }
+      }
+      
+      recognition.onend = () => {
+        console.log('음성 인식 종료됨')
+        setIsTranscribing(false)
+      }
+      
+      console.log('음성 인식 시작 중...')
+      recognition.start()
+    } catch (error) {
+      console.error('직접 음성 인식 오류:', error)
+      setIsTranscribing(false)
+      setTranscriptionProgress('음성 인식 실패')
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
+    if (!user?.uid) {
+      alert('로그인이 필요합니다.')
+      router.push('/login')
+      return
+    }
 
     setIsSubmitting(true)
     try {
-      const response = await fetch('/api/snaps', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          note: note.trim() || undefined,
-          imageUrl: selectedImage || undefined,
-          tags: tags.trim() ? tags.split(',').map(tag => tag.trim()) : undefined,
-          capturedAt: new Date(),
-        }),
-      })
-
-      if (response.ok) {
-        const { id } = await response.json()
-        console.log('Snap created:', id)
-        // 성공 시 저널 페이지로 이동
-        router.push('/journal')
-      } else {
-        console.error('Failed to create snap')
+      const snapData = {
+        title: title.trim(),
+        note: note.trim() || null,
+        imageUrl: selectedImage || null,
+        tags: tags.trim() ? tags.split(',').map(tag => tag.trim()) : [],
+        capturedAt: new Date(),
+        userId: user.uid,
       }
+
+      const result = await createSnap(snapData)
+      console.log('Snap created:', result.id)
+      
+      // 성공 시 저널 페이지로 이동
+      router.push('/journal?tab=snaps')
     } catch (error) {
       console.error('Error creating snap:', error)
+      alert('스냅 저장에 실패했습니다. 다시 시도해주세요.')
     } finally {
       setIsSubmitting(false)
     }

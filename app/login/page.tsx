@@ -1,17 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { signInWithEmail, signUpWithEmail } from '@/lib/auth'
 import EmailFindModal from '@/components/EmailFindModal'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -21,6 +22,18 @@ export default function LoginPage() {
   const [success, setSuccess] = useState('')
   const [autoLogin, setAutoLogin] = useState(false)
   const [isEmailFindModalOpen, setIsEmailFindModalOpen] = useState(false)
+  const [isPasswordResetModalOpen, setIsPasswordResetModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<'email-find' | 'password-reset'>('email-find')
+
+  // 이메일 인증 완료 상태 확인
+  useEffect(() => {
+    const verified = searchParams.get('verified')
+    if (verified === 'true') {
+      setSuccess('이메일 인증이 완료되었습니다. 로그인해주세요.')
+      // URL에서 verified 파라미터 제거
+      router.replace('/login')
+    }
+  }, [searchParams, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,7 +97,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 pt-16">
       <div className="w-full max-w-md space-y-8">
         {/* 로고 및 타이틀 */}
         <div className="text-center space-y-4">
@@ -200,7 +213,10 @@ export default function LoginPage() {
                     <button
                       type="button"
                       className="text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => setIsEmailFindModalOpen(true)}
+                      onClick={() => {
+                        setModalMode('email-find')
+                        setIsEmailFindModalOpen(true)
+                      }}
                     >
                       이메일 찾기
                     </button>
@@ -209,8 +225,8 @@ export default function LoginPage() {
                       type="button"
                       className="text-muted-foreground hover:text-foreground transition-colors"
                       onClick={() => {
-                        // TODO: 비밀번호 찾기 기능 구현
-                        alert('비밀번호 찾기 기능은 준비 중입니다.')
+                        setModalMode('password-reset')
+                        setIsEmailFindModalOpen(true)
                       }}
                     >
                       비밀번호 찾기
@@ -231,18 +247,13 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-
-        {/* 안내 메시지 */}
-        <div className="text-center text-sm text-muted-foreground">
-          <p>회원가입 시 이메일 인증이 필요합니다.</p>
-          <p>인증 후 로그인이 가능합니다.</p>
-        </div>
       </div>
 
-      {/* 이메일 찾기 모달 */}
+      {/* 이메일 찾기/비밀번호 찾기 모달 */}
       <EmailFindModal
         isOpen={isEmailFindModalOpen}
         onClose={() => setIsEmailFindModalOpen(false)}
+        mode={modalMode}
       />
     </div>
   )

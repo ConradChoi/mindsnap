@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Heart, Calendar, Smile, Meh, Frown, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { createRememberToday } from '@/lib/firebase-service'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface RememberData {
   step1: {
@@ -31,6 +33,7 @@ interface RememberData {
 
 export default function RememberTodayPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const [data, setData] = useState<RememberData>({
     step1: { mood: '', memorableEvent: '' },
@@ -41,6 +44,76 @@ export default function RememberTodayPage() {
     step6: { summary: '' }
   })
   const [selectedDate, setSelectedDate] = useState('')
+  
+  // 알림 설정 확인 함수
+  const getNotificationSetting = () => {
+    const savedSetting = localStorage.getItem('rememberTodayNotification')
+    return savedSetting !== null ? JSON.parse(savedSetting) : true
+  }
+  
+  // 날짜 선택 시 알림 표시 함수
+  const showDateSelectionNotification = (date: string) => {
+    if (!getNotificationSetting()) return
+    
+    const formattedDate = formatDate(date)
+    if (formattedDate) {
+      // 브라우저 알림 API 사용
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification('날짜 선택 완료', {
+            body: `선택한 날짜: ${formattedDate}`,
+            icon: '/mindsnap_logo.png'
+          })
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              new Notification('날짜 선택 완료', {
+                body: `선택한 날짜: ${formattedDate}`,
+                icon: '/mindsnap_logo.png'
+              })
+            }
+          })
+        }
+      }
+      
+      // 브라우저 알림이 지원되지 않는 경우 alert 사용
+      if (!('Notification' in window)) {
+        alert(`날짜가 선택되었습니다: ${formattedDate}`)
+      }
+    }
+  }
+  
+  // 날짜 형식을 YYYY-MM-DD로 변환하는 함수
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ''
+    
+    // 이미 YYYY-MM-DD 형식인 경우 그대로 반환
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString
+    }
+    
+    // 다른 형식의 날짜를 YYYY-MM-DD로 변환
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return dateString
+    
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    
+    return `${year}-${month}-${day}`
+  }
+  
+  // 날짜 입력 처리 (수동 입력용)
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // YYYY-MM-DD 형식 검증
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      setSelectedDate(value)
+    } else if (value === '') {
+      setSelectedDate('')
+    }
+    // 다른 형식은 무시
+  }
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const moodOptions = [
@@ -91,38 +164,45 @@ export default function RememberTodayPage() {
   const handleSubmit = async (withNotification: boolean) => {
     // 알림 설정 후 저장하기의 경우에만 날짜 선택 필수
     if (withNotification && !selectedDate) return
+    if (!user?.uid) {
+      alert('로그인이 필요합니다.')
+      router.push('/login')
+      return
+    }
+
+    // 알림 설정이 OFF인 경우 확인 메시지 표시
+    if (withNotification && !getNotificationSetting()) {
+      const shouldProceed = confirm('현재 알림이 꺼져 있습니다. 저장 시 알림은 자동으로 활성화 됩니다.\n계속하시겠습니까?')
+      if (!shouldProceed) {
+        // 취소 선택 시 저장 중단
+        return
+      } else {
+        // 확인 선택 시 알림 설정을 자동으로 활성화
+        localStorage.setItem('rememberTodayNotification', JSON.stringify(true))
+      }
+    }
 
     setIsSubmitting(true)
     try {
-      // "오늘을 기억할래" API 호출
-      const response = await fetch('/api/remember-today', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mood: data.step1.mood,
-          memorableEvent: data.step1.memorableEvent,
-          reason: data.step2.reason,
-          cause: data.step3.cause,
-          improvement: data.step4.improvement,
-          action: data.step5.action,
-          summary: data.step6.summary,
-          selectedDate: selectedDate || null,
-          withNotification,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save remember today record')
+      const rememberData = {
+        userId: user.uid,
+        mood: data.step1.mood,
+        memorableEvent: data.step1.memorableEvent,
+        reason: data.step2.reason,
+        cause: data.step3.cause,
+        improvement: data.step4.improvement,
+        action: data.step5.action,
+        summary: data.step6.summary,
+        selectedDate: selectedDate || null,
+        withNotification,
       }
 
-      const result = await response.json()
+      const result = await createRememberToday(rememberData)
       console.log('기억하기 저장 성공:', result)
 
-      // 성공 시 홈으로 이동
+      // 성공 시 저널 > 오늘 탭으로 이동
       setTimeout(() => {
-        router.push('/')
+        router.push('/journal?tab=remember')
       }, 2000)
     } catch (error) {
       console.error('Error saving memory:', error)
@@ -173,11 +253,31 @@ export default function RememberTodayPage() {
             value={data.step1.memorableEvent}
             onChange={(e) => updateData('step1', 'memorableEvent', e.target.value)}
             placeholder="오늘 하루 중 가장 인상깊었던 일을 자세히 적어보세요 (10글자 이상)"
-            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+              data.step1.memorableEvent.length > 0 && data.step1.memorableEvent.length < 10
+                ? 'border-red-300 focus:ring-red-200'
+                : data.step1.memorableEvent.length >= 10
+                ? 'border-green-300 focus:ring-green-200'
+                : 'border-input'
+            }`}
             maxLength={500}
           />
-          <div className="text-xs text-muted-foreground text-right">
-            {data.step1.memorableEvent.length}/500
+          <div className="flex items-center justify-between text-xs">
+            <div className={`${
+              data.step1.memorableEvent.length > 0 && data.step1.memorableEvent.length < 10
+                ? 'text-red-500'
+                : data.step1.memorableEvent.length >= 10
+                ? 'text-green-500'
+                : 'text-muted-foreground'
+            }`}>
+              {data.step1.memorableEvent.length < 10 
+                ? `최소 10글자 이상 입력해주세요 (${data.step1.memorableEvent.length}/10)`
+                : `글자 수: ${data.step1.memorableEvent.length}/500`
+              }
+            </div>
+            {data.step1.memorableEvent.length >= 10 && (
+              <div className="text-green-500">✓</div>
+            )}
           </div>
         </div>
       </CardContent>
@@ -202,11 +302,31 @@ export default function RememberTodayPage() {
             value={data.step2.reason}
             onChange={(e) => updateData('step2', 'reason', e.target.value)}
             placeholder="그 일이 왜 인상깊었는지 생각해보세요 (10글자 이상)"
-            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+              data.step2.reason.length > 0 && data.step2.reason.length < 10
+                ? 'border-red-300 focus:ring-red-200'
+                : data.step2.reason.length >= 10
+                ? 'border-green-300 focus:ring-green-200'
+                : 'border-input'
+            }`}
             maxLength={500}
           />
-          <div className="text-xs text-muted-foreground text-right">
-            {data.step2.reason.length}/500
+          <div className="flex items-center justify-between text-xs">
+            <div className={`${
+              data.step2.reason.length > 0 && data.step2.reason.length < 10
+                ? 'text-red-500'
+                : data.step2.reason.length >= 10
+                ? 'text-green-500'
+                : 'text-muted-foreground'
+            }`}>
+              {data.step2.reason.length < 10 
+                ? `최소 10글자 이상 입력해주세요 (${data.step2.reason.length}/10)`
+                : `글자 수: ${data.step2.reason.length}/500`
+              }
+            </div>
+            {data.step2.reason.length >= 10 && (
+              <div className="text-green-500">✓</div>
+            )}
           </div>
         </div>
       </CardContent>
@@ -318,11 +438,31 @@ export default function RememberTodayPage() {
             value={data.step6.summary}
             onChange={(e) => updateData('step6', 'summary', e.target.value)}
             placeholder="오늘 하루를 한 문장으로 요약해보세요 (5글자 이상)"
-            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+              data.step6.summary.length > 0 && data.step6.summary.length < 5
+                ? 'border-red-300 focus:ring-red-200'
+                : data.step6.summary.length >= 5
+                ? 'border-green-300 focus:ring-green-200'
+                : 'border-input'
+            }`}
             maxLength={100}
           />
-          <div className="text-xs text-muted-foreground text-right">
-            {data.step6.summary.length}/100
+          <div className="flex items-center justify-between text-xs">
+            <div className={`${
+              data.step6.summary.length > 0 && data.step6.summary.length < 5
+                ? 'text-red-500'
+                : data.step6.summary.length >= 5
+                ? 'text-green-500'
+                : 'text-muted-foreground'
+            }`}>
+              {data.step6.summary.length < 5 
+                ? `최소 5글자 이상 입력해주세요 (${data.step6.summary.length}/5)`
+                : `글자 수: ${data.step6.summary.length}/100`
+              }
+            </div>
+            {data.step6.summary.length >= 5 && (
+              <div className="text-green-500">✓</div>
+            )}
           </div>
         </div>
       </CardContent>
@@ -348,14 +488,41 @@ export default function RememberTodayPage() {
           <label htmlFor="selectedDate" className="text-sm font-medium">
             년월일 선택 *
           </label>
-          <Input
-            id="selectedDate"
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-12 text-mobile-base"
-            required
-          />
+          <div className="relative">
+            {/* 실제 date input */}
+            <input
+              id="selectedDate"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedDate(e.target.value)
+                  // 날짜 선택 시 알림 표시
+                  showDateSelectionNotification(e.target.value)
+                }
+              }}
+              className="w-full h-12 px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 pr-12"
+              required
+            />
+            {/* 달력 아이콘 */}
+            <button
+              type="button"
+              onClick={() => {
+                const dateInput = document.getElementById('selectedDate') as HTMLInputElement
+                if (dateInput) {
+                  // showPicker가 지원되는 경우 사용, 아니면 click 사용
+                  if (dateInput.showPicker) {
+                    dateInput.showPicker()
+                  } else {
+                    dateInput.click()
+                  }
+                }
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground hover:scale-110 transition-transform"
+            >
+              <Calendar className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* 액션 버튼들 */}
