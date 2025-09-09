@@ -5,8 +5,8 @@ frontend:
       commands:
         - echo "Starting preBuild phase..."
         - nvm use 20
-        - echo "Node version: $(node --version)"
-        - echo "NPM version: $(npm --version)"
+        - echo "Node version" && node --version
+        - echo "NPM version" && npm --version
         - echo "Installing dependencies..."
         - npm ci --cache .npm --prefer-offline --no-audit
         - echo "Dependencies installed successfully"
