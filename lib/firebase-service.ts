@@ -122,8 +122,8 @@ export const getSnaps = async (userId: string, limitCount = 30) => {
     
     // 클라이언트에서 정렬
     return snaps.sort((a, b) => {
-      const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt)
-      const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt)
+      const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt)
+      const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt)
       return dateB.getTime() - dateA.getTime()
     })
   } catch (error: any) {
@@ -518,7 +518,7 @@ export const canChangeNickname = async (userId: string) => {
     }
     
     // 마지막 변경일로부터 30일이 지났는지 확인
-    const lastChangeDate = lastNicknameChange.toDate()
+    const lastChangeDate = lastNicknameChange instanceof Date ? lastNicknameChange : new Date(lastNicknameChange)
     const now = new Date()
     const daysSinceLastChange = Math.floor((now.getTime() - lastChangeDate.getTime()) / (1000 * 60 * 60 * 24))
     
