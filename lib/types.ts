@@ -13,6 +13,7 @@ export interface Snap {
   title: string
   note?: string
   imageUrl?: string
+  audioUrl?: string
   tags: string[]
   capturedAt: Date
   createdAt: Date
