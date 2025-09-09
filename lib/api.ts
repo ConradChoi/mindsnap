@@ -6,7 +6,19 @@ export const apiCall = async (url: string, options: RequestInit = {}) => {
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+  }
+
+  // options.headers가 있으면 추가
+  if (options.headers) {
+    if (options.headers instanceof Headers) {
+      // Headers 객체인 경우
+      options.headers.forEach((value, key) => {
+        headers[key] = value
+      })
+    } else if (typeof options.headers === 'object') {
+      // 일반 객체인 경우
+      Object.assign(headers, options.headers)
+    }
   }
 
   // 인증된 사용자가 있으면 토큰 추가
