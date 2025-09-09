@@ -193,7 +193,7 @@ export default function RememberTodayPage() {
         improvement: data.step4.improvement,
         action: data.step5.action,
         summary: data.step6.summary,
-        selectedDate: selectedDate || null,
+        selectedDate: selectedDate || undefined,
         withNotification,
       }
 
