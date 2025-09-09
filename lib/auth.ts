@@ -84,8 +84,8 @@ export const signUpWithEmail = async (email: string, password: string) => {
     // 사용자 정보를 Firestore에 저장
     await createUser({
       email: userCredential.user.email!,
-      name: null,
-      image: null,
+      name: undefined,
+      image: undefined,
     })
     
     // 회원가입 성공 로깅
