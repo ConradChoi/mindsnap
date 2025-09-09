@@ -320,8 +320,8 @@ export const getRememberToday = async (userId: string, limitCount = 30) => {
     
     // 클라이언트에서 정렬
     return records.sort((a, b) => {
-      const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt)
-      const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt)
+      const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt)
+      const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt)
       return dateB.getTime() - dateA.getTime()
       })
   } catch (error: any) {
