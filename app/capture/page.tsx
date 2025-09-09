@@ -584,8 +584,8 @@ export default function CapturePage() {
     try {
       const snapData = {
         title: title.trim(),
-        note: note.trim() || null,
-        imageUrl: selectedImage || null,
+        note: note.trim() || undefined,
+        imageUrl: selectedImage || undefined,
         tags: tags.trim() ? tags.split(',').map(tag => tag.trim()) : [],
         capturedAt: new Date(),
         userId: user.uid,
