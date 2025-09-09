@@ -1,1 +1,7 @@
-{}
+{
+  "/page": "app/page.js",
+  "/journal/page": "app/journal/page.js",
+  "/login/page": "app/login/page.js",
+  "/settings/restore-deleted/page": "app/settings/restore-deleted/page.js",
+  "/records/page": "app/records/page.js"
+}
