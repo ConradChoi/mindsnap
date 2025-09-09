@@ -193,8 +193,8 @@ export const subscribeToSnaps = (
           const snaps = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Snap[]
           // 클라이언트에서 정렬
           const sortedSnaps = snaps.sort((a, b) => {
-            const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt)
-            const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt)
+            const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt)
+            const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt)
             return dateB.getTime() - dateA.getTime()
           })
           callback(sortedSnaps)
