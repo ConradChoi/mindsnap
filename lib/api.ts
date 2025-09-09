@@ -4,7 +4,7 @@ import { getCurrentUser } from './auth'
 export const apiCall = async (url: string, options: RequestInit = {}) => {
   const user = getCurrentUser()
   
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...options.headers,
   }
