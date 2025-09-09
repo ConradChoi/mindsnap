@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSnap, getSnaps } from '@/lib/firebase-service'
-import { CreateSnapReq, CreateSnapRes, ListSnapsRes } from '@/contracts/snaps'
+import { CreateSnapReq, CreateSnapRes, ListSnapsRes, ErrorRes } from '@/contracts/snaps'
 
 // GET: 최신순 목록 반환
-export async function GET(request: NextRequest): Promise<NextResponse<ListSnapsRes>> {
+export async function GET(request: NextRequest): Promise<NextResponse<ListSnapsRes | ErrorRes>> {
   try {
     // Authorization 헤더에서 사용자 ID 추출
     const authHeader = request.headers.get('authorization')
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ListSnapsR
 }
 
 // POST: 새 Snap 생성
-export async function POST(request: NextRequest): Promise<NextResponse<CreateSnapRes>> {
+export async function POST(request: NextRequest): Promise<NextResponse<CreateSnapRes | ErrorRes>> {
   try {
     const body: CreateSnapReq = await request.json()
     const { title, note, imageUrl, tags, capturedAt } = body

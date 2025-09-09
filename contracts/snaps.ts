@@ -12,6 +12,11 @@ export interface CreateSnapRes {
   id: string
 }
 
+// 에러 응답 타입
+export interface ErrorRes {
+  error: string
+}
+
 // Snap 목록 응답 타입
 export interface ListSnapsRes {
   snaps: {
