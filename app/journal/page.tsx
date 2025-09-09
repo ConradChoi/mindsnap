@@ -655,7 +655,7 @@ export default function JournalPage() {
     console.log('Snap ID:', snapId)
     console.log('Current snaps:', snaps)
     
-    const newDeletedSet = new Set([...deletedSnaps, snapId])
+    const newDeletedSet = new Set(Array.from(deletedSnaps).concat(snapId))
     setDeletedSnaps(newDeletedSet)
     
     // 실제 스냅 데이터 찾기
@@ -670,7 +670,7 @@ export default function JournalPage() {
   
   const handleDeleteMoodRecord = (recordId: string) => {
     console.log('Deleting mood record:', recordId)
-    const newDeletedSet = new Set([...deletedMoodRecords, recordId])
+    const newDeletedSet = new Set(Array.from(deletedMoodRecords).concat(recordId))
     setDeletedMoodRecords(newDeletedSet)
     
     // 실제 마음 기록 데이터 찾기
@@ -681,7 +681,7 @@ export default function JournalPage() {
   
   const handleDeleteRememberRecord = (recordId: string) => {
     console.log('Deleting remember record:', recordId)
-    const newDeletedSet = new Set([...deletedRememberRecords, recordId])
+    const newDeletedSet = new Set(Array.from(deletedRememberRecords).concat(recordId))
     setDeletedRememberRecords(newDeletedSet)
     
     // 실제 오늘 기록 데이터 찾기
