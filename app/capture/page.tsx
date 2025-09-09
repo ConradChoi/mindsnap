@@ -11,10 +11,54 @@ import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logUserActivity, ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from '@/lib/analytics'
 
 // Web Speech API 타입 정의
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start(): void
+  stop(): void
+  abort(): void
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
+  onend: (() => void) | null
+}
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList
+  resultIndex: number
+}
+
+interface SpeechRecognitionResultList {
+  length: number
+  item(index: number): SpeechRecognitionResult
+  [index: number]: SpeechRecognitionResult
+}
+
+interface SpeechRecognitionResult {
+  length: number
+  item(index: number): SpeechRecognitionAlternative
+  [index: number]: SpeechRecognitionAlternative
+  isFinal: boolean
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string
+  confidence: number
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string
+  message: string
+}
+
 declare global {
   interface Window {
-    SpeechRecognition: typeof SpeechRecognition
-    webkitSpeechRecognition: typeof SpeechRecognition
+    SpeechRecognition: {
+      new (): SpeechRecognition
+    }
+    webkitSpeechRecognition: {
+      new (): SpeechRecognition
+    }
   }
 }
 
