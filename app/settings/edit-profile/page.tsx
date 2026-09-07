@@ -8,7 +8,7 @@ import { ArrowLeft, User, Mail, Lock, Save, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { updatePassword, updateProfile } from '@/lib/auth'
-import { canChangeNickname as checkNicknameChangeEligibility } from '@/lib/firebase-service'
+import { canChangeNickname as checkNicknameChangeEligibility } from '@/lib/supabase-service'
 
 export default function EditProfilePage() {
   const router = useRouter()

@@ -4,23 +4,27 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Heart, Calendar, Smile, Meh, Frown } from 'lucide-react'
+import { Heart, Calendar, Smile, Meh, Frown, Angry, Laugh } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { createMoodRecord } from '@/lib/firebase-service'
+import { createMoodRecord } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
+import { MoodLevel } from '@/lib/types'
 
 export default function DailyMoodPage() {
   const router = useRouter()
   const { user } = useAuth()
   const [mood, setMood] = useState('')
   const [note, setNote] = useState('')
-  const [selectedMood, setSelectedMood] = useState('')
+  const [selectedMood, setSelectedMood] = useState<MoodLevel | 0>(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const moodOptions = [
-    { value: 'happy', label: '행복', icon: Smile, color: 'text-green-500' },
-    { value: 'neutral', label: '보통', icon: Meh, color: 'text-yellow-500' },
-    { value: 'sad', label: '우울', icon: Frown, color: 'text-blue-500' },
+  // 5단계 기분 척도 (1: 매우 우울 ~ 5: 매우 행복) - mood_records/remember_today 공통
+  const moodOptions: { value: MoodLevel; label: string; icon: typeof Smile; color: string }[] = [
+    { value: 1, label: '매우 우울', icon: Angry, color: 'text-red-500' },
+    { value: 2, label: '우울', icon: Frown, color: 'text-blue-500' },
+    { value: 3, label: '보통', icon: Meh, color: 'text-yellow-500' },
+    { value: 4, label: '행복', icon: Smile, color: 'text-green-500' },
+    { value: 5, label: '매우 행복', icon: Laugh, color: 'text-emerald-500' },
   ]
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,7 +40,7 @@ export default function DailyMoodPage() {
     try {
       const moodData = {
         userId: user.uid,
-        mood: selectedMood === 'happy' ? 8 : selectedMood === 'neutral' ? 5 : 2,
+        mood: selectedMood,
         note: note || mood,
         activities: [],
       }
@@ -77,20 +81,20 @@ export default function DailyMoodPage() {
             {/* 기분 선택 */}
             <div className="space-y-3">
               <label className="text-sm font-medium">오늘의 기분을 선택하세요 *</label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-5 gap-2">
                 {moodOptions.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => setSelectedMood(option.value)}
-                    className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    className={`p-2 border-2 rounded-lg text-center transition-all ${
                       selectedMood === option.value
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <option.icon className={`w-8 h-8 mx-auto mb-2 ${option.color}`} />
-                    <div className="text-sm font-medium">{option.label}</div>
+                    <option.icon className={`w-6 h-6 mx-auto mb-1 ${option.color}`} />
+                    <div className="text-xs font-medium">{option.label}</div>
                   </button>
                 ))}
               </div>

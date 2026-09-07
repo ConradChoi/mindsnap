@@ -4,14 +4,15 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Heart, Calendar, Smile, Meh, Frown, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react'
+import { Heart, Calendar, Smile, Meh, Frown, Angry, Laugh, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { createRememberToday } from '@/lib/firebase-service'
+import { createRememberToday } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
+import { MoodLevel } from '@/lib/types'
 
 interface RememberData {
   step1: {
-    mood: string
+    mood: MoodLevel | 0
     memorableEvent: string
   }
   step2: {
@@ -36,7 +37,7 @@ export default function RememberTodayPage() {
   const { user } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const [data, setData] = useState<RememberData>({
-    step1: { mood: '', memorableEvent: '' },
+    step1: { mood: 0, memorableEvent: '' },
     step2: { reason: '' },
     step3: { cause: '' },
     step4: { improvement: '' },
@@ -116,11 +117,18 @@ export default function RememberTodayPage() {
   }
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const moodOptions = [
-    { value: 'happy', label: '행복', icon: Smile, color: 'text-green-500' },
-    { value: 'neutral', label: '보통', icon: Meh, color: 'text-yellow-500' },
-    { value: 'sad', label: '우울', icon: Frown, color: 'text-blue-500' },
+  // 5단계 기분 척도 (daily-mood와 동일하게 통일)
+  const moodOptions: { value: MoodLevel; label: string; icon: typeof Smile; color: string }[] = [
+    { value: 1, label: '매우 우울', icon: Angry, color: 'text-red-500' },
+    { value: 2, label: '우울', icon: Frown, color: 'text-blue-500' },
+    { value: 3, label: '보통', icon: Meh, color: 'text-yellow-500' },
+    { value: 4, label: '행복', icon: Smile, color: 'text-green-500' },
+    { value: 5, label: '매우 행복', icon: Laugh, color: 'text-emerald-500' },
   ]
+
+  const updateMood = (mood: MoodLevel) => {
+    setData(prev => ({ ...prev, step1: { ...prev.step1, mood } }))
+  }
 
   const updateData = (step: keyof RememberData, field: string, value: string) => {
     setData(prev => ({
@@ -182,6 +190,11 @@ export default function RememberTodayPage() {
       }
     }
 
+    if (!data.step1.mood) {
+      alert('기분을 선택해주세요.')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const rememberData = {
@@ -224,20 +237,20 @@ export default function RememberTodayPage() {
         {/* 기분 선택 */}
         <div className="space-y-3">
           <label className="text-sm font-medium">오늘의 기분을 선택하세요 *</label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-5 gap-2">
             {moodOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"
-                onClick={() => updateData('step1', 'mood', option.value)}
-                className={`p-4 border-2 rounded-lg text-center transition-all ${
+                onClick={() => updateMood(option.value)}
+                className={`p-2 border-2 rounded-lg text-center transition-all ${
                   data.step1.mood === option.value
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
                 }`}
               >
-                <option.icon className={`w-8 h-8 mx-auto mb-2 ${option.color}`} />
-                <div className="text-sm font-medium">{option.label}</div>
+                <option.icon className={`w-6 h-6 mx-auto mb-1 ${option.color}`} />
+                <div className="text-xs font-medium">{option.label}</div>
               </button>
             ))}
           </div>

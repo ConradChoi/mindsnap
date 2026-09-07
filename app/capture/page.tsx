@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Camera, Save, Tag, X, Upload, Mic, MicOff, Play, Square } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { createSnap } from '@/lib/firebase-service'
+import { createSnap } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logUserActivity, ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from '@/lib/analytics'
 
@@ -70,6 +70,9 @@ export default function CapturePage() {
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  // T4: 미리보기용 blob: URL(selectedImage)과 별개로, 실제 업로드에 쓸 File/Blob 원본을 보관한다.
+  // blob: URL은 브라우저 세션에서만 유효하므로 DB에는 절대 저장하지 않는다.
+  const [selectedImageFile, setSelectedImageFile] = useState<File | Blob | null>(null)
   const [tags, setTags] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -194,8 +197,9 @@ export default function CapturePage() {
           canvas.toBlob((blob) => {
             if (blob) {
               const url = URL.createObjectURL(blob)
-              setSelectedImage(url)
-              
+              setSelectedImage(url) // 미리보기 전용 (DB에는 저장하지 않음)
+              setSelectedImageFile(blob) // 업로드용 원본 Blob
+
               // 모달 제거 및 스트림 정리
               document.body.removeChild(modal)
               stream.getTracks().forEach(track => track.stop())
@@ -249,10 +253,11 @@ export default function CapturePage() {
           return
         }
         
-        // 파일을 URL로 변환하여 이미지 설정
+        // 파일을 URL로 변환하여 미리보기 이미지 설정 (DB에는 저장하지 않음)
         const url = URL.createObjectURL(file)
         setSelectedImage(url)
-        
+        setSelectedImageFile(file) // 업로드용 원본 File
+
         // 파일 입력 요소 제거
         document.body.removeChild(input)
       }
@@ -585,7 +590,8 @@ export default function CapturePage() {
       const snapData = {
         title: title.trim(),
         note: note.trim() || undefined,
-        imageUrl: selectedImage || undefined,
+        imageFile: selectedImageFile || undefined,
+        audioFile: audioBlob || undefined,
         tags: tags.trim() ? tags.split(',').map(tag => tag.trim()) : [],
         capturedAt: new Date(),
         userId: user.uid,
@@ -768,7 +774,11 @@ export default function CapturePage() {
                     />
                     <button
                       type="button"
-                      onClick={() => setSelectedImage(null)}
+                      onClick={() => {
+                        if (selectedImage) URL.revokeObjectURL(selectedImage)
+                        setSelectedImage(null)
+                        setSelectedImageFile(null)
+                      }}
                       className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
                     >
                       <X className="w-4 h-4" />

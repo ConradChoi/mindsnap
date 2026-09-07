@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Search, Plus, Tag, Calendar, Heart, Camera, Brain, Smile, Meh, Frown, Mic, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { ListSnapsRes } from '@/contracts/snaps'
-import { getMoodRecords, getRememberToday, getSnaps } from '@/lib/firebase-service'
+import { getMoodRecords, getRememberToday, getSnaps, deleteSnap, deleteMoodRecord, deleteRememberToday } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logTabSwitch } from '@/lib/analytics'
 
@@ -500,194 +500,42 @@ export default function JournalPage() {
   const [hasMoreRememberRecords, setHasMoreRememberRecords] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
-  // 삭제 관련 상태
+  // T5: 삭제 상태는 더 이상 localStorage에 보관하지 않는다. 삭제는 DB의 deleted_at
+  // 컬럼(소프트 삭제)에 즉시 반영되고(휴지통은 설정 > 삭제된 기록에서 복원), 여기서는
+  // 삭제 요청이 성공한 항목을 화면에서 즉시 감추기 위한 낙관적(optimistic) UI 상태만 둔다.
   const [deletedSnaps, setDeletedSnaps] = useState<Set<string>>(new Set())
   const [deletedMoodRecords, setDeletedMoodRecords] = useState<Set<string>>(new Set())
   const [deletedRememberRecords, setDeletedRememberRecords] = useState<Set<string>>(new Set())
-  
-  // localStorage에서 삭제된 항목 불러오기 (2주 이내만)
-  const loadDeletedItems = () => {
-    if (!user?.uid) return
-    
+
+  // 삭제 함수들: DB에 소프트 삭제(deleted_at) 반영 후 화면에서 즉시 제거
+  const handleDeleteSnap = async (snapId: string) => {
     try {
-      const twoWeeksAgo = new Date()
-      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
-      
-      const deletedSnapsData = localStorage.getItem(`deletedSnaps_${user.uid}`)
-      const deletedMoodData = localStorage.getItem(`deletedMoodRecords_${user.uid}`)
-      const deletedRememberData = localStorage.getItem(`deletedRememberRecords_${user.uid}`)
-      
-      // 스냅 삭제된 항목 처리
-      if (deletedSnapsData) {
-        try {
-          const data = JSON.parse(deletedSnapsData)
-          if (typeof data === 'object' && !Array.isArray(data)) {
-            // 새로운 형식 (날짜 정보 포함)
-            const validSnaps = Object.keys(data).filter(itemId => {
-              const deletedAt = new Date(data[itemId].deletedAt)
-              return deletedAt >= twoWeeksAgo
-            })
-            setDeletedSnaps(new Set(validSnaps))
-      } else {
-            // 기존 형식 (배열)
-            setDeletedSnaps(new Set(data))
-          }
-        } catch (e) {
-          console.error('Error parsing deleted snaps data:', e)
-        }
-      }
-      
-      // 마음 기록 삭제된 항목 처리
-      if (deletedMoodData) {
-        try {
-          const data = JSON.parse(deletedMoodData)
-          if (typeof data === 'object' && !Array.isArray(data)) {
-            // 새로운 형식 (날짜 정보 포함)
-            const validMoodRecords = Object.keys(data).filter(itemId => {
-              const deletedAt = new Date(data[itemId].deletedAt)
-              return deletedAt >= twoWeeksAgo
-            })
-            setDeletedMoodRecords(new Set(validMoodRecords))
-          } else {
-            // 기존 형식 (배열)
-            setDeletedMoodRecords(new Set(data))
-          }
-        } catch (e) {
-          console.error('Error parsing deleted mood records data:', e)
-        }
-      }
-      
-      // 오늘 기록 삭제된 항목 처리
-      if (deletedRememberData) {
-        try {
-          const data = JSON.parse(deletedRememberData)
-          if (typeof data === 'object' && !Array.isArray(data)) {
-            // 새로운 형식 (날짜 정보 포함)
-            const validRememberRecords = Object.keys(data).filter(itemId => {
-              const deletedAt = new Date(data[itemId].deletedAt)
-              return deletedAt >= twoWeeksAgo
-            })
-            setDeletedRememberRecords(new Set(validRememberRecords))
-      } else {
-            // 기존 형식 (배열)
-            setDeletedRememberRecords(new Set(data))
-          }
-        } catch (e) {
-          console.error('Error parsing deleted remember records data:', e)
-        }
-      }
+      await deleteSnap(snapId, user?.uid)
+      setDeletedSnaps(prev => new Set(prev).add(snapId))
     } catch (error) {
-      console.error('Error loading deleted items:', error)
+      console.error('Error deleting snap:', error)
+      alert('스냅 삭제에 실패했습니다. 다시 시도해주세요.')
     }
   }
-  
-  // localStorage에 삭제된 항목 저장하기 (날짜 정보와 실제 데이터 포함)
-  const saveDeletedItemsWithData = (type: 'snaps' | 'mood' | 'remember', deletedSet: Set<string>, newItemId: string, itemData: any) => {
-    if (!user?.uid) {
-      console.error('No user ID available for saving deleted items')
-      return
-    }
-    
+
+  const handleDeleteMoodRecord = async (recordId: string) => {
     try {
-      const key = type === 'snaps' ? `deletedSnaps_${user.uid}` :
-                  type === 'mood' ? `deletedMoodRecords_${user.uid}` :
-                  `deletedRememberRecords_${user.uid}`
-      
-      console.log(`=== SAVING DELETED ${type.toUpperCase()} ITEM ===`)
-      console.log('Key:', key)
-      console.log('New Item ID:', newItemId)
-      console.log('Item Data:', itemData)
-      console.log('Item Title:', itemData?.title)
-      console.log('Item Note:', itemData?.note)
-      
-      // 기존 삭제된 항목 정보 불러오기
-      const existingData = localStorage.getItem(key)
-      let deletedItemsData: { [key: string]: { deletedAt: string, data: any } } = {}
-      
-      if (existingData) {
-        try {
-          deletedItemsData = JSON.parse(existingData)
-          console.log('Existing deleted items data:', deletedItemsData)
-        } catch (e) {
-          console.log('Error parsing existing data, trying array format:', e)
-          // 기존 데이터가 배열 형태인 경우 (이전 버전 호환성)
-          const oldArray = JSON.parse(existingData)
-          if (Array.isArray(oldArray)) {
-            oldArray.forEach((itemId: string) => {
-              deletedItemsData[itemId] = { 
-                deletedAt: new Date().toISOString(),
-                data: null // 기존 데이터는 정보가 없음
-              }
-            })
-          }
-        }
-      } else {
-        console.log('No existing data found, starting fresh')
-      }
-      
-      // 새로 삭제된 항목에 현재 날짜와 실제 데이터 추가
-      const deletedAt = new Date().toISOString()
-      deletedItemsData[newItemId] = { 
-        deletedAt: deletedAt,
-        data: itemData
-      }
-      
-      console.log('Final deleted items data to save:', deletedItemsData)
-      console.log('Data for new item:', deletedItemsData[newItemId])
-      
-      localStorage.setItem(key, JSON.stringify(deletedItemsData))
-      console.log('Successfully saved to localStorage')
-      
-      // 저장 후 즉시 확인
-      const savedData = localStorage.getItem(key)
-      console.log('Verification - saved data:', savedData)
-      const parsedSavedData = JSON.parse(savedData || '{}')
-      console.log('Verification - parsed saved data:', parsedSavedData)
-      console.log(`=== SAVING COMPLETED FOR ${type.toUpperCase()} ===`)
+      await deleteMoodRecord(recordId, user?.uid)
+      setDeletedMoodRecords(prev => new Set(prev).add(recordId))
     } catch (error) {
-      console.error('Error saving deleted items with data:', error)
+      console.error('Error deleting mood record:', error)
+      alert('마음 기록 삭제에 실패했습니다. 다시 시도해주세요.')
     }
   }
-  
-  // 삭제 함수들 (삭제 날짜 정보와 실제 데이터 포함)
-  const handleDeleteSnap = (snapId: string) => {
-    console.log('=== DELETING SNAP ===')
-    console.log('Snap ID:', snapId)
-    console.log('Current snaps:', snaps)
-    
-    const newDeletedSet = new Set(Array.from(deletedSnaps).concat(snapId))
-    setDeletedSnaps(newDeletedSet)
-    
-    // 실제 스냅 데이터 찾기
-    const snapData = snaps.find(snap => snap.id === snapId)
-    console.log('Found snap data:', snapData)
-    console.log('Snap title:', snapData?.title)
-    console.log('Snap note:', snapData?.note)
-    
-    saveDeletedItemsWithData('snaps', newDeletedSet, snapId, snapData)
-    console.log('=== SNAP DELETION COMPLETED ===')
-  }
-  
-  const handleDeleteMoodRecord = (recordId: string) => {
-    console.log('Deleting mood record:', recordId)
-    const newDeletedSet = new Set(Array.from(deletedMoodRecords).concat(recordId))
-    setDeletedMoodRecords(newDeletedSet)
-    
-    // 실제 마음 기록 데이터 찾기
-    const moodData = moodRecords.find(record => record.id === recordId)
-    console.log('Found mood data:', moodData)
-    saveDeletedItemsWithData('mood', newDeletedSet, recordId, moodData)
-  }
-  
-  const handleDeleteRememberRecord = (recordId: string) => {
-    console.log('Deleting remember record:', recordId)
-    const newDeletedSet = new Set(Array.from(deletedRememberRecords).concat(recordId))
-    setDeletedRememberRecords(newDeletedSet)
-    
-    // 실제 오늘 기록 데이터 찾기
-    const rememberData = rememberTodayRecords.find(record => record.id === recordId)
-    console.log('Found remember data:', rememberData)
-    saveDeletedItemsWithData('remember', newDeletedSet, recordId, rememberData)
+
+  const handleDeleteRememberRecord = async (recordId: string) => {
+    try {
+      await deleteRememberToday(recordId, user?.uid)
+      setDeletedRememberRecords(prev => new Set(prev).add(recordId))
+    } catch (error) {
+      console.error('Error deleting remember record:', error)
+      alert('오늘 기록 삭제에 실패했습니다. 다시 시도해주세요.')
+    }
   }
 
   useEffect(() => {
@@ -695,9 +543,13 @@ export default function JournalPage() {
       console.log('Fetching data for user:', user.uid)
       setIsLoading(true)
       
-      // 삭제된 항목 불러오기
-      loadDeletedItems()
-      
+      // 새 사용자/재조회 시 이전 세션의 낙관적 삭제 표시를 초기화
+      // (getSnaps/getMoodRecords/getRememberToday는 deleted_at IS NULL만 반환하므로
+      //  재조회 결과에는 어차피 삭제된 항목이 없다)
+      setDeletedSnaps(new Set())
+      setDeletedMoodRecords(new Set())
+      setDeletedRememberRecords(new Set())
+
       // 일반적인 데이터 페칭 방식으로 변경
       const fetchData = async () => {
         try {

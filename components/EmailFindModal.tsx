@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { checkEmailExists, generateVerificationCode, verifyCode, sendVerificationEmail } from '@/lib/auth'
-import { auth } from '@/lib/firebase'
+import { verifyCode, sendVerificationEmail, sendPasswordReset } from '@/lib/auth'
 
 interface EmailFindModalProps {
   isOpen: boolean
@@ -37,45 +36,29 @@ export default function EmailFindModal({ isOpen, onClose, mode }: EmailFindModal
     setError('')
 
     try {
-      console.log('Checking email existence for:', email)
-      console.log('Firebase auth available:', !!auth)
-      
-      // Firebase에서 이메일 존재 여부 확인
-      const emailExists = await checkEmailExists(email)
-      console.log('Email exists result:', emailExists)
-      
-      if (emailExists) {
-        if (mode === 'email-find') {
-          // 이메일 찾기: 인증번호 생성 및 표시
-          const emailResult = await sendVerificationEmail(email)
-          
-          if (emailResult.success && emailResult.verificationCode) {
-            setStoredVerificationCode(emailResult.verificationCode)
-            setSuccess('인증번호가 생성되었습니다. 아래 인증번호를 확인해주세요.')
-            setStep('verification')
-          } else {
-            setError(`인증번호 생성 실패: ${emailResult.error}`)
-          }
-        } else {
-          // 비밀번호 찾기: 비밀번호 재설정 이메일 발송
-          const { sendPasswordReset } = await import('@/lib/auth')
-          const result = await sendPasswordReset(email)
-          
-          if (result.error) {
-            setError(`비밀번호 재설정 이메일 발송 실패: ${result.error}`)
-          } else {
-            setSuccess('비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.')
-            // 비밀번호 찾기는 이메일 발송 후 완료
-            setTimeout(() => {
-              onClose()
-            }, 2000)
-          }
-        }
+      if (mode === 'email-find') {
+        // 이메일 찾기는 Supabase 구조상 안전하게 구현할 수 없어 지원하지 않는다
+        // (lib/auth.ts의 sendVerificationEmail 주석 참고: 이메일 존재 여부 조회 자체가
+        //  계정 존재 여부를 노출하는 취약점이 됨). 존재 여부를 먼저 확인하지 않고
+        // 곧바로 안내 메시지를 표시한다.
+        const emailResult = await sendVerificationEmail(email)
+        setError(emailResult.error || '이메일 찾기 기능은 지원되지 않습니다. 비밀번호 찾기를 이용해주세요.')
       } else {
-        setError('가입된 이메일이 없습니다.')
+        // 비밀번호 찾기: Supabase는 이메일 존재 여부와 무관하게 항상 성공 응답을 준다
+        // (계정 존재 여부 노출 방지) — 별도의 존재 확인 없이 바로 재설정 메일을 요청한다.
+        const result = await sendPasswordReset(email)
+
+        if (result.error) {
+          setError(`비밀번호 재설정 이메일 발송 실패: ${result.error}`)
+        } else {
+          setSuccess('비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.')
+          setTimeout(() => {
+            onClose()
+          }, 2000)
+        }
       }
     } catch (error) {
-      console.error('Error checking email:', error)
+      console.error('Error requesting email/password recovery:', error)
       setError('오류가 발생했습니다. 다시 시도해주세요.')
     } finally {
       setIsLoading(false)
