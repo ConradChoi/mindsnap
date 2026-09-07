@@ -11,9 +11,6 @@ RUN npm install
 # 소스 코드 복사
 COPY . .
 
-# Prisma 클라이언트 생성
-RUN npm run prisma:generate
-
 # 포트 노출
 EXPOSE 3000
 

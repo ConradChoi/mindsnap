@@ -11,10 +11,6 @@ npm --version
 echo "📦 의존성 설치 중..."
 npm install
 
-# Prisma 클라이언트 생성
-echo "🗄️ Prisma 클라이언트 생성 중..."
-npx prisma generate
-
 # 환경변수 파일 생성
 echo "⚙️ 환경변수 파일 생성 중..."
 if [ ! -f .env.local ]; then
@@ -32,8 +28,5 @@ echo ""
 echo "다음 명령어로 개발 서버를 실행할 수 있습니다:"
 echo "  npm run dev"
 echo ""
-echo "데이터베이스 마이그레이션을 실행하려면:"
-echo "  npm run prisma:migrate"
-echo ""
-echo "Prisma Studio를 실행하려면:"
-echo "  npm run prisma:studio"
+echo "데이터베이스 마이그레이션(supabase/migrations/*.sql)은 Supabase Dashboard의"
+echo "SQL Editor에서 직접 실행하거나 Supabase CLI(supabase db push)로 적용하세요."
