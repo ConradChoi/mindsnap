@@ -53,6 +53,23 @@ export interface RememberToday {
   deletedAt?: Date
 }
 
+// 성격 검사 — 도형심리 / 에니어그램 / 생일 인생주기 공통 타입.
+// 결과 설명 텍스트는 DB가 아니라 data/*.json 콘텐츠 파일에서 관리한다.
+export type PersonalityTestType = 'shape' | 'enneagram' | 'life_cycle'
+
+export interface PersonalityTestResult {
+  id: string
+  userId: string
+  testType: PersonalityTestType
+  input: Record<string, unknown>
+  resultKey: string
+  createdAt: Date
+  deletedAt?: Date
+}
+
+// 도형심리 검사 도형 4종
+export type ShapeId = 'circle' | 'triangle' | 'square' | 's'
+
 // 휴지통 화면(설정 > 삭제된 기록)에서 사용하는 통합 항목 타입
 export type TrashItemType = 'snap' | 'mood' | 'remember'
 

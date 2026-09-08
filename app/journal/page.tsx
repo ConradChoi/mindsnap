@@ -7,9 +7,19 @@ import { Input } from '@/components/ui/input'
 import { Search, Plus, Tag, Calendar, Heart, Camera, Brain, Smile, Meh, Frown, Mic, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { ListSnapsRes } from '@/contracts/snaps'
-import { getMoodRecords, getRememberToday, getSnaps, deleteSnap, deleteMoodRecord, deleteRememberToday } from '@/lib/supabase-service'
+import {
+  getMoodRecords,
+  getRememberToday,
+  getSnaps,
+  getPersonalityTestResults,
+  deleteSnap,
+  deleteMoodRecord,
+  deleteRememberToday,
+} from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logTabSwitch } from '@/lib/analytics'
+import { PersonalityTestResult } from '@/lib/types'
+import shapeContent from '@/data/shape-psychology-content.json'
 
 // 날짜 포맷팅 함수
 const formatDate = (date: Date | any) => {
@@ -434,23 +444,53 @@ const SnapList = ({
   )
 }
 
+// 도형심리 결과 콘텐츠에서 제목만 참조 (본문은 검사 화면에서만 보여줌)
+const shapeTitles = shapeContent as unknown as Record<string, { title: string }>
+
 // 성격 목록 컴포넌트
-const PersonalityList = () => {
+const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
+  if (results.length === 0) {
+    return (
+      <div className="text-center py-12 space-y-4">
+        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+          <Brain className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <div>
+          <h3 className="font-medium text-foreground">아직 성격 검사 결과가 없습니다</h3>
+          <p className="text-muted-foreground text-mobile-sm mt-1">
+            성격 검사를 통해 자신을 알아보세요
+          </p>
+        </div>
+        <Link href="/personality-test">
+          <Button>
+            <Brain className="w-4 h-4 mr-2" />
+            성격 검사하기
+          </Button>
+        </Link>
+      </div>
+    )
+  }
+
   return (
-    <div className="text-center py-12 space-y-4">
-      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-        <Brain className="w-8 h-8 text-muted-foreground" />
-      </div>
-      <div>
-        <h3 className="font-medium text-foreground">아직 성격 검사 결과가 없습니다</h3>
-        <p className="text-muted-foreground text-mobile-sm mt-1">
-          성격 검사를 통해 자신을 알아보세요
-        </p>
-      </div>
-      <Link href="/personality-test">
-        <Button>
+    <div className="space-y-3">
+      {results.map((result) => (
+        <Card key={result.id}>
+          <CardContent className="py-4 flex items-center justify-between">
+            <div>
+              <p className="font-medium text-foreground">
+                {result.testType === 'shape'
+                  ? `도형심리 · ${shapeTitles[result.resultKey]?.title ?? result.resultKey}`
+                  : result.testType}
+              </p>
+              <p className="text-mobile-sm text-muted-foreground mt-1">{formatDate(result.createdAt)}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+      <Link href="/personality-test" className="block">
+        <Button variant="outline" className="w-full">
           <Brain className="w-4 h-4 mr-2" />
-          성격 검사하기
+          새로 검사하기
         </Button>
       </Link>
     </div>
@@ -463,6 +503,7 @@ export default function JournalPage() {
   const [filteredSnaps, setFilteredSnaps] = useState<ListSnapsRes['snaps']>([])
   const [moodRecords, setMoodRecords] = useState<any[]>([])
   const [rememberTodayRecords, setRememberTodayRecords] = useState<any[]>([])
+  const [personalityResults, setPersonalityResults] = useState<PersonalityTestResult[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('snaps')
@@ -560,22 +601,25 @@ export default function JournalPage() {
           })
           
           // 병렬로 데이터 페칭
-          const [snapsData, moodData, rememberData] = await Promise.all([
+          const [snapsData, moodData, rememberData, personalityData] = await Promise.all([
             getSnaps(user.uid),
             getMoodRecords(user.uid),
-            getRememberToday(user.uid)
+            getRememberToday(user.uid),
+            getPersonalityTestResults(user.uid)
           ])
-          
+
           console.log('Data fetched successfully:', {
             snaps: snapsData.length,
             moodRecords: moodData.length,
-            rememberToday: rememberData.length
+            rememberToday: rememberData.length,
+            personalityResults: personalityData.length
           })
-          
+
           // 데이터 설정 (삭제된 항목은 나중에 필터링됨)
           setSnaps(snapsData)
           setMoodRecords(moodData)
           setRememberTodayRecords(rememberData)
+          setPersonalityResults(personalityData)
           
           setIsLoading(false)
         } catch (error) {
@@ -837,7 +881,7 @@ export default function JournalPage() {
                 </>
               )}
               {activeTab === 'personality' && (
-                <PersonalityList />
+                <PersonalityList results={personalityResults} />
               )}
 
            </div>

@@ -9,10 +9,12 @@ import { supabase } from './supabase'
 import { getSignedUrls, uploadSnapMedia } from './storage'
 import {
   mapMoodRecordRow,
+  mapPersonalityTestResultRow,
   mapProfileRow,
   mapRememberTodayRow,
   mapSnapRow,
   MoodRecordRow,
+  PersonalityTestResultRow,
   ProfileRow,
   RememberTodayRow,
   SnapRow,
@@ -21,6 +23,8 @@ import {
 import {
   MoodLevel,
   MoodRecord,
+  PersonalityTestResult,
+  PersonalityTestType,
   RememberToday,
   Snap,
   TrashItem,
@@ -404,6 +408,68 @@ export const restoreRememberToday = async (rememberTodayId: string, userId?: str
       itemType: 'remember',
       rememberTodayId,
     })
+  }
+}
+
+// =========================================================
+// 성격 검사 결과 — 도형심리 / 에니어그램 / 생일 인생주기 공통
+// =========================================================
+
+interface CreatePersonalityTestResultInput {
+  userId: string
+  testType: PersonalityTestType
+  input: Record<string, unknown>
+  resultKey: string
+}
+
+export const createPersonalityTestResult = async (
+  data: CreatePersonalityTestResultInput
+): Promise<PersonalityTestResult> => {
+  const { data: row, error } = await supabase
+    .from('personality_test_results')
+    .insert({
+      user_id: data.userId,
+      test_type: data.testType,
+      input: data.input,
+      result_key: data.resultKey,
+    })
+    .select()
+    .single<PersonalityTestResultRow>()
+
+  if (error) throw error
+
+  await logUserActivity(data.userId, ACTIVITY_ACTIONS.CREATE_PERSONALITY_TEST, ACTIVITY_CATEGORIES.JOURNAL, {
+    personalityTestResultId: row.id,
+    testType: data.testType,
+    resultKey: data.resultKey,
+  })
+
+  return mapPersonalityTestResultRow(row)
+}
+
+export const getPersonalityTestResults = async (
+  userId: string,
+  testType?: PersonalityTestType
+): Promise<PersonalityTestResult[]> => {
+  try {
+    let query = supabase
+      .from('personality_test_results')
+      .select('*')
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+
+    if (testType) {
+      query = query.eq('test_type', testType)
+    }
+
+    const { data, error } = await query.returns<PersonalityTestResultRow[]>()
+
+    if (error) throw error
+    return (data ?? []).map(mapPersonalityTestResultRow)
+  } catch (error) {
+    console.error('Error fetching personality test results:', error)
+    return []
   }
 }
 

@@ -71,10 +71,20 @@ export interface RememberTodayRow {
   deleted_at: string | null
 }
 
+export interface PersonalityTestResultRow {
+  id: string
+  user_id: string
+  test_type: string
+  input: Record<string, unknown>
+  result_key: string
+  created_at: string
+  deleted_at: string | null
+}
+
 // ---- Row -> 앱 타입 매퍼 (엔티티별 1개) ----
 // 이미지/음성 signed URL은 매퍼 밖(lib/storage.ts)에서 채워 넣는다 (I/O가 필요하므로).
 
-import { MoodRecord, RememberToday, Snap, User } from './types'
+import { MoodRecord, PersonalityTestResult, PersonalityTestType, RememberToday, Snap, User } from './types'
 
 export const mapProfileRow = (row: ProfileRow, email: string | null): User => ({
   uid: row.id,
@@ -104,6 +114,16 @@ export const mapMoodRecordRow = (row: MoodRecordRow): MoodRecord => ({
   mood: row.mood_level as MoodRecord['mood'],
   note: row.note ?? undefined,
   activities: row.activities ?? [],
+  createdAt: toDateRequired(row.created_at),
+  deletedAt: toDate(row.deleted_at),
+})
+
+export const mapPersonalityTestResultRow = (row: PersonalityTestResultRow): PersonalityTestResult => ({
+  id: row.id,
+  userId: row.user_id,
+  testType: row.test_type as PersonalityTestType,
+  input: row.input ?? {},
+  resultKey: row.result_key,
   createdAt: toDateRequired(row.created_at),
   deletedAt: toDate(row.deleted_at),
 })

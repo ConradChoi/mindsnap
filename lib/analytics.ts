@@ -31,6 +31,7 @@ export const ACTIVITY_ACTIONS = {
   CREATE_SNAP: 'create_snap',
   CREATE_MOOD: 'create_mood',
   CREATE_REMEMBER: 'create_remember',
+  CREATE_PERSONALITY_TEST: 'create_personality_test',
   DELETE_SNAP: 'delete_snap',
   DELETE_MOOD: 'delete_mood',
   DELETE_REMEMBER: 'delete_remember',

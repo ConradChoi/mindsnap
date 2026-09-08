@@ -12,7 +12,8 @@ export default function PersonalityTestPage() {
       icon: Shapes,
       color: 'text-blue-500',
       bgColor: 'bg-blue-50',
-      href: '/personality-test/shape'
+      href: '/personality-test/shape',
+      available: true
     },
     {
       id: 'enneagram',
@@ -21,7 +22,8 @@ export default function PersonalityTestPage() {
       icon: Users,
       color: 'text-purple-500',
       bgColor: 'bg-purple-50',
-      href: '/personality-test/enneagram'
+      href: '/personality-test/enneagram',
+      available: false
     }
   ]
 
@@ -37,20 +39,35 @@ export default function PersonalityTestPage() {
       {/* 검사 옵션들 */}
       <div className="space-y-4">
         {testOptions.map((test) => (
-          <Link key={test.id} href={test.href} className="block">
-            <Card className={`hover:shadow-lg transition-all duration-200 cursor-pointer ${test.bgColor}`}>
+          test.available ? (
+            <Link key={test.id} href={test.href} className="block">
+              <Card className={`hover:shadow-lg transition-all duration-200 cursor-pointer ${test.bgColor}`}>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-3 text-xl">
+                    <test.icon className={`w-6 h-6 ${test.color}`} />
+                    <span>{test.title}</span>
+                    <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
+                  </CardTitle>
+                  <p className="text-muted-foreground">
+                    {test.description}
+                  </p>
+                </CardHeader>
+              </Card>
+            </Link>
+          ) : (
+            <Card key={test.id} className="opacity-50 cursor-not-allowed">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-3 text-xl">
-                  <test.icon className={`w-6 h-6 ${test.color}`} />
+                  <test.icon className="w-6 h-6 text-muted-foreground" />
                   <span>{test.title}</span>
-                  <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
+                  <span className="ml-auto text-xs font-normal text-muted-foreground">준비중</span>
                 </CardTitle>
                 <p className="text-muted-foreground">
                   {test.description}
                 </p>
               </CardHeader>
             </Card>
-          </Link>
+          )
         ))}
       </div>
 
