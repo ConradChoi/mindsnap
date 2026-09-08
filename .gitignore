@@ -1,5 +1,7 @@
 node_modules
 *.tsbuildinfo
+.next
+.DS_Store
 
 # 환경변수 (실제 키/비밀번호는 절대 커밋하지 않는다)
 .env
