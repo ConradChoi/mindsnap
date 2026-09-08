@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Shapes, Users, Brain, ArrowRight } from 'lucide-react'
+import { Shapes, Users, Brain, ArrowRight, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
 export default function PersonalityTestPage() {
@@ -23,6 +23,16 @@ export default function PersonalityTestPage() {
       color: 'text-purple-500',
       bgColor: 'bg-purple-50',
       href: '/personality-test/enneagram',
+      available: true
+    },
+    {
+      id: 'life-cycle',
+      title: '생일로 보는 인생주기',
+      description: '생년월일로 나이별 인생의 흐름을 카드로 확인합니다',
+      icon: Sparkles,
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-50',
+      href: '/personality-test/life-cycle',
       available: true
     }
   ]

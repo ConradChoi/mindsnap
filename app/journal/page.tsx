@@ -21,6 +21,7 @@ import { logPageView, logTabSwitch } from '@/lib/analytics'
 import { PersonalityTestResult } from '@/lib/types'
 import shapeContent from '@/data/shape-psychology-content.json'
 import enneagramContent from '@/data/enneagram-content.json'
+import tarotContent from '@/data/tarot-life-cycle-content.json'
 
 // 날짜 포맷팅 함수
 const formatDate = (date: Date | any) => {
@@ -448,6 +449,7 @@ const SnapList = ({
 // 도형심리 결과 콘텐츠에서 제목만 참조 (본문은 검사 화면에서만 보여줌)
 const shapeTitles = shapeContent as unknown as Record<string, { title: string }>
 const enneagramTypeTitles = (enneagramContent as any).types as Record<string, { title: string }>
+const tarotCardTitles = tarotContent as unknown as Record<string, { title: string }>
 
 // 성격 목록 컴포넌트
 const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
@@ -484,6 +486,8 @@ const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
                   ? `도형심리 · ${shapeTitles[result.resultKey]?.title ?? result.resultKey}`
                   : result.testType === 'enneagram'
                   ? `에니어그램 · ${enneagramTypeTitles[result.resultKey]?.title ?? result.resultKey}`
+                  : result.testType === 'life_cycle'
+                  ? `생일 인생주기 · ${tarotCardTitles[result.resultKey]?.title ?? result.resultKey}`
                   : result.testType}
               </p>
               <p className="text-mobile-sm text-muted-foreground mt-1">{formatDate(result.createdAt)}</p>
