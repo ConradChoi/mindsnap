@@ -7,8 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { signInWithEmail, signUpWithEmail } from '@/lib/auth'
+import { signInWithEmail, signUpWithEmail, signInWithProvider, type SocialProvider } from '@/lib/auth'
 import EmailFindModal from '@/components/EmailFindModal'
+
+// 카카오는 이메일 동의항목이 "비즈 앱 전환" 후에만 신청 가능해(카카오 정책) 현재 Supabase에서
+// 비활성화 상태다. 코드는 남겨두고 버튼만 숨긴다 — 비즈 앱 전환 완료되면 이 값만 true로 바꾸면 된다.
+const SHOW_KAKAO_LOGIN = false
 
 export default function LoginPage() {
   const router = useRouter()
@@ -64,14 +68,8 @@ export default function LoginPage() {
         // 로그인
         const result = await signInWithEmail(email, password)
         if (result.error) {
-          // Firebase 에러 메시지를 사용자 친화적으로 변경
-          if (result.error.includes('user-not-found')) {
-            setError('가입된 정보가 없습니다.')
-          } else if (result.error.includes('wrong-password') || result.error.includes('invalid-credential')) {
-            setError('입력한 정보가 다릅니다.')
-          } else {
-            setError(result.error)
-          }
+          // lib/auth.ts의 translateAuthError가 이미 한글 메시지로 변환해서 반환한다
+          setError(result.error)
         } else {
           setSuccess('로그인되었습니다.')
           setTimeout(() => {
@@ -82,6 +80,19 @@ export default function LoginPage() {
     } catch (error) {
       setError('오류가 발생했습니다. 다시 시도해주세요.')
     } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSocialLogin = async (provider: SocialProvider) => {
+    setError('')
+    setSuccess('')
+    setIsLoading(true)
+    const result = await signInWithProvider(provider)
+    // 성공 시에는 Supabase가 즉시 해당 플랫폼 로그인 화면으로 리다이렉트하므로
+    // 아래 코드는 provider 자체가 아직 연결되지 않았을 때(에러)만 실행된다.
+    if (result.error) {
+      setError(result.error)
       setIsLoading(false)
     }
   }
@@ -245,6 +256,50 @@ export default function LoginPage() {
                 {isSignUp ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
               </Button>
             </form>
+
+            {/* SNS 로그인 — 각 플랫폼 개발자 계정 등록 및 Supabase 연결 전까지는 클릭 시 에러가 표시된다 */}
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">또는</span>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading}
+                  onClick={() => handleSocialLogin('google')}
+                  className="w-full h-12 bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                >
+                  Google로 계속하기
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading}
+                  onClick={() => handleSocialLogin('apple')}
+                  className="w-full h-12 bg-black text-white border-black hover:bg-gray-900 hover:text-white"
+                >
+                  Apple로 계속하기
+                </Button>
+                {SHOW_KAKAO_LOGIN && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isLoading}
+                    onClick={() => handleSocialLogin('kakao')}
+                    className="w-full h-12 bg-[#FEE500] text-black border-[#FEE500] hover:bg-[#FDD800] hover:text-black"
+                  >
+                    카카오로 계속하기
+                  </Button>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

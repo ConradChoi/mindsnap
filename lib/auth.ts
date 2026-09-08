@@ -3,6 +3,51 @@ import { supabase } from './supabase'
 import { updateUserNickname } from './supabase-service'
 import { logUserActivity, ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from './analytics'
 
+// Supabase Auth 에러 메시지를 한글 안내 문구로 변환한다.
+// Supabase가 반환하는 원문 메시지는 영어 고정이라(버전에 따라 표현이 조금씩 다를 수 있어
+// 정확히 일치하는 문자열보다는 핵심 키워드로 매칭한다), 화면에는 이 함수를 거친 값만 노출한다.
+const translateAuthError = (error: { message?: string } | null | undefined): string => {
+  const original = error?.message ?? ''
+
+  // 이미 한글 메시지(우리 코드에서 throw한 Error 등)라면 그대로 둔다 —
+  // 안 그러면 알려진 패턴에 안 걸릴 때 아래 기본 문구로 덮어써서 오히려 정보가 사라진다.
+  if (/[가-힣]/.test(original)) {
+    return original
+  }
+
+  const message = original.toLowerCase()
+
+  if (message.includes('invalid login credentials')) {
+    return '이메일 또는 비밀번호가 올바르지 않습니다.'
+  }
+  if (message.includes('email rate limit') || message.includes('over_email_send_rate_limit')) {
+    return '이메일 발송 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'
+  }
+  if (message.includes('for security purposes') && message.includes('seconds')) {
+    return '보안을 위해 잠시 후 다시 시도해주세요.'
+  }
+  if (message.includes('user already registered') || message.includes('already registered')) {
+    return '이미 가입된 이메일입니다.'
+  }
+  if (message.includes('email not confirmed')) {
+    return '이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요.'
+  }
+  if (message.includes('password should be at least')) {
+    return '비밀번호는 최소 6자 이상이어야 합니다.'
+  }
+  if (message.includes('unable to validate email address') || message.includes('invalid email')) {
+    return '올바른 이메일 형식이 아닙니다.'
+  }
+  if (message.includes('new password should be different')) {
+    return '새 비밀번호는 이전 비밀번호와 달라야 합니다.'
+  }
+  if (message.includes('network') || message.includes('fetch failed')) {
+    return '네트워크 연결을 확인해주세요.'
+  }
+
+  return '요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+}
+
 // 인증 상태 관리 (Supabase는 onAuthStateChange로 세션 변화를 알려준다)
 export const subscribeToAuthChanges = (callback: (user: SupabaseUser | null) => void) => {
   const { data: listener } = supabase.auth.onAuthStateChange((_event, session: Session | null) => {
@@ -18,7 +63,7 @@ export const signInWithEmail = async (email: string, password: string) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    return { user: null, error: error.message }
+    return { user: null, error: translateAuthError(error) }
   }
 
   await logUserActivity(data.user.id, ACTIVITY_ACTIONS.LOGIN, ACTIVITY_CATEGORIES.AUTH, {
@@ -27,6 +72,29 @@ export const signInWithEmail = async (email: string, password: string) => {
   })
 
   return { user: data.user, error: null }
+}
+
+// SNS(OAuth) 로그인/회원가입 — Google/Apple/Kakao 공통.
+// Supabase가 세 provider 모두 기본 지원하지만, 각 플랫폼(Google Cloud Console / Apple Developer /
+// Kakao Developers)에서 앱을 등록하고 발급받은 키를 Supabase 대시보드(Authentication > Providers)에
+// 연결해야 실제로 동작한다. 코드는 그 등록 여부와 무관하게 미리 준비해두는 것.
+// 리다이렉트 방식이라 여기서 로그인 성공 여부를 바로 알 수 없다 — 세션 발급은 페이지 복귀 후
+// AuthContext의 onAuthStateChange(subscribeToAuthChanges)가 처리한다.
+export type SocialProvider = 'google' | 'apple' | 'kakao'
+
+export const signInWithProvider = async (provider: SocialProvider) => {
+  const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo },
+  })
+
+  if (error) {
+    return { error: translateAuthError(error) }
+  }
+
+  return { error: null }
 }
 
 // 이메일/비밀번호로 회원가입
@@ -40,7 +108,7 @@ export const signUpWithEmail = async (email: string, password: string) => {
   })
 
   if (error) {
-    return { user: null, error: error.message }
+    return { user: null, error: translateAuthError(error) }
   }
 
   // profiles row는 DB 트리거(on_auth_user_created)가 자동 생성한다.
@@ -62,11 +130,11 @@ export const sendPasswordReset = async (email: string) => {
   try {
     const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/login?reset=true` : undefined
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
-    if (error) return { error: error.message }
+    if (error) return { error: translateAuthError(error) }
     return { error: null }
   } catch (error: any) {
     console.error('Error sending password reset email:', error)
-    return { error: error.message }
+    return { error: translateAuthError(error) }
   }
 }
 
@@ -77,7 +145,7 @@ export const signOutUser = async () => {
     const user = data.user
 
     const { error } = await supabase.auth.signOut()
-    if (error) return { error: error.message }
+    if (error) return { error: translateAuthError(error) }
 
     if (user) {
       await logUserActivity(user.id, ACTIVITY_ACTIONS.LOGOUT, ACTIVITY_CATEGORIES.AUTH, { email: user.email })
@@ -85,7 +153,7 @@ export const signOutUser = async () => {
 
     return { error: null }
   } catch (error: any) {
-    return { error: error.message }
+    return { error: translateAuthError(error) }
   }
 }
 
@@ -145,7 +213,7 @@ export const updatePassword = async (currentPassword: string, newPassword: strin
         success: false,
         error: updateError.message,
       })
-      return { error: updateError.message || '비밀번호 변경 중 오류가 발생했습니다.' }
+      return { error: translateAuthError(updateError) }
     }
 
     await logUserActivity(user.id, ACTIVITY_ACTIONS.CHANGE_PASSWORD, ACTIVITY_CATEGORIES.SETTINGS, {
@@ -156,7 +224,7 @@ export const updatePassword = async (currentPassword: string, newPassword: strin
     return { error: null }
   } catch (error: any) {
     console.error('비밀번호 업데이트 오류:', error)
-    return { error: error.message || '비밀번호 변경 중 오류가 발생했습니다.' }
+    return { error: error.message ? translateAuthError(error) : '비밀번호 변경 중 오류가 발생했습니다.' }
   }
 }
 
@@ -197,6 +265,6 @@ export const updateProfile = async (profileData: { displayName?: string; photoUR
     return { error: null }
   } catch (error: any) {
     console.error('프로필 업데이트 오류:', error)
-    return { error: error.message }
+    return { error: translateAuthError(error) }
   }
 }
