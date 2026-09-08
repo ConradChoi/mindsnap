@@ -75,6 +75,11 @@ export default function EnneagramTestPage() {
     const typeKey = gridMap[gridKey]
     const content = types[typeKey]
 
+    if (!content) {
+      alert('아직 결과 콘텐츠가 준비되지 않았습니다. data/enneagram-content.json을 채워 넣은 후 다시 시도해주세요.')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       await createPersonalityTestResult({
