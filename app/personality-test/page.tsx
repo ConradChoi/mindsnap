@@ -23,7 +23,7 @@ export default function PersonalityTestPage() {
       color: 'text-purple-500',
       bgColor: 'bg-purple-50',
       href: '/personality-test/enneagram',
-      available: false
+      available: true
     }
   ]
 
