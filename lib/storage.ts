@@ -22,6 +22,8 @@ const extensionFromMime = (mime: string | undefined, fallback: string): string =
     'audio/mp4': 'm4a',
     'audio/wav': 'wav',
     'audio/mpeg': 'mp3',
+    // capacitor-voice-recorder(iOS/Android 네이티브 녹음)가 반환하는 포맷
+    'audio/aac': 'aac',
   }
   return map[mime] ?? fallback
 }

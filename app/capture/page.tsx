@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { createSnap } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logUserActivity, ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from '@/lib/analytics'
 import { Camera, MediaTypeSelection } from '@capacitor/camera'
+import { VoiceRecorder } from 'capacitor-voice-recorder'
 
 // Web Speech API 타입 정의
 interface SpeechRecognition extends EventTarget {
@@ -83,8 +84,8 @@ export default function CapturePage() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
-  
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // 음성-텍스트 변환 관련 상태
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcriptionText, setTranscriptionText] = useState('')
@@ -154,63 +155,37 @@ export default function CapturePage() {
     }
   }
 
-  // 음성 녹음 시작
+  // base64 오디오 데이터를 업로드용 Blob으로 변환 (capacitor-voice-recorder는 base64로 결과를 반환한다)
+  const base64ToBlob = (base64: string, mimeType: string): Blob => {
+    const byteChars = atob(base64)
+    const byteNumbers = new Array(byteChars.length)
+    for (let i = 0; i < byteChars.length; i++) {
+      byteNumbers[i] = byteChars.charCodeAt(i)
+    }
+    return new Blob([new Uint8Array(byteNumbers)], { type: mimeType })
+  }
+
+  // 음성 녹음 시작 (iOS/Android: 네이티브 녹음기, 웹: MediaRecorder 폴백은 플러그인 내부에서 처리)
   const startRecording = async () => {
     try {
-      // 더 안정적인 오디오 설정
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 44100
-        }
-      })
-      
-      // 지원되는 MIME 타입 확인
-      let mimeType = 'audio/webm'
-      if (!MediaRecorder.isTypeSupported('audio/webm')) {
-        if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4'
-        } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-          mimeType = 'audio/wav'
-        } else {
-          mimeType = 'audio/webm' // 기본값
+      const hasPermission = await VoiceRecorder.hasAudioRecordingPermission()
+      if (!hasPermission.value) {
+        const requested = await VoiceRecorder.requestAudioRecordingPermission()
+        if (!requested.value) {
+          alert('마이크 권한이 필요합니다.')
+          return
         }
       }
-      
-      const recorder = new MediaRecorder(stream, { mimeType })
-      const chunks: Blob[] = []
-      
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data)
-        }
-      }
-      
-      // 녹음 시간 카운터
-      const timer = setInterval(() => {
-        setRecordingTime(prev => prev + 1)
-      }, 1000)
-      
-      recorder.onstop = () => {
-        clearInterval(timer)
-        const blob = new Blob(chunks, { type: mimeType })
-        const url = URL.createObjectURL(blob)
-        setAudioBlob(blob)
-        setAudioUrl(url)
-        setRecordingTime(0)
-        stream.getTracks().forEach(track => track.stop())
-        
-        // 녹음 완료 후 바로 음성 인식 시작 (간단한 방식)
-        startSimpleSpeechRecognition()
-      }
-      
-      recorder.start()
-      setMediaRecorder(recorder)
+
+      await VoiceRecorder.startRecording()
       setIsRecording(true)
       setRecordingTime(0)
-      
+
+      // 녹음 시간 카운터 (플러그인이 자체 타이머를 제공하지 않아 UI 표시용으로 직접 관리)
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1)
+      }, 1000)
+
       // 녹음 시작 로깅
       if (user?.uid) {
         await logUserActivity(
@@ -224,16 +199,31 @@ export default function CapturePage() {
       }
     } catch (error) {
       console.error('음성 녹음을 시작할 수 없습니다:', error)
-      alert('마이크 권한이 필요합니다.')
+      alert('마이크 권한이 필요하거나 녹음을 시작할 수 없습니다.')
     }
   }
 
   // 음성 녹음 중지
   const stopRecording = async () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop()
+    if (!isRecording) return
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+
+    try {
+      const result = await VoiceRecorder.stopRecording()
       setIsRecording(false)
-      
+
+      const { recordDataBase64, mimeType } = result.value
+      if (recordDataBase64) {
+        setAudioBlob(base64ToBlob(recordDataBase64, mimeType))
+        setAudioUrl(`data:${mimeType};base64,${recordDataBase64}`)
+      }
+      const finishedRecordingTime = recordingTime
+      setRecordingTime(0)
+
       // 녹음 중지 로깅
       if (user?.uid) {
         await logUserActivity(
@@ -241,11 +231,19 @@ export default function CapturePage() {
           ACTIVITY_ACTIONS.STOP_RECORDING,
           ACTIVITY_CATEGORIES.CAPTURE,
           {
-            recordingDuration: recordingTime,
+            recordingDuration: finishedRecordingTime,
             timestamp: new Date().toISOString()
           }
         )
       }
+
+      // 녹음 완료 후 바로 음성 인식 시작 (간단한 방식)
+      startSimpleSpeechRecognition()
+    } catch (error) {
+      console.error('음성 녹음 중지 실패:', error)
+      setIsRecording(false)
+      setRecordingTime(0)
+      alert('녹음을 저장하지 못했습니다. 다시 시도해주세요.')
     }
   }
 
@@ -264,13 +262,10 @@ export default function CapturePage() {
     setIsPlaying(false)
   }
 
-  // 녹음된 음성 삭제
+  // 녹음된 음성 삭제 (audioUrl은 data: URI라 URL.revokeObjectURL 대상이 아니다)
   const deleteAudio = () => {
     setAudioBlob(null)
     setAudioUrl(null)
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl)
-    }
   }
 
   // 녹음 시간을 mm:ss 형식으로 변환
