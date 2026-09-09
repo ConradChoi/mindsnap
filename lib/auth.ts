@@ -108,7 +108,7 @@ export const signUpWithEmail = async (email: string, password: string) => {
   })
 
   if (error) {
-    return { user: null, error: translateAuthError(error) }
+    return { user: null, session: null, error: translateAuthError(error) }
   }
 
   // profiles row는 DB 트리거(on_auth_user_created)가 자동 생성한다.
@@ -121,7 +121,10 @@ export const signUpWithEmail = async (email: string, password: string) => {
     })
   }
 
-  return { user: data.user, error: null }
+  // Supabase 프로젝트의 "Confirm email"이 꺼져 있으면 signUp 시점에 session이 바로 발급된다
+  // (이메일 인증 없이 즉시 로그인 상태). 켜져 있으면 session이 null이라 인증 메일을 눌러야 한다.
+  // 화면에서는 이 값을 보고 "인증 메일을 확인하라"는 안내를 보여줄지 결정한다.
+  return { user: data.user, session: data.session, error: null }
 }
 
 // 비밀번호 재설정 이메일 발송

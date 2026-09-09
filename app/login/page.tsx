@@ -56,7 +56,14 @@ export default function LoginPage() {
         const result = await signUpWithEmail(email, password)
         if (result.error) {
           setError(result.error)
+        } else if (result.session) {
+          // Supabase의 "Confirm email"이 꺼져 있으면 가입과 동시에 로그인 상태가 된다.
+          setSuccess('회원가입이 완료되었습니다. 바로 이용하실 수 있어요.')
+          setTimeout(() => {
+            router.push('/')
+          }, 1000)
         } else {
+          // Confirm email이 켜져 있는 경우에만 인증 메일 확인 안내가 필요하다.
           setSuccess('회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.')
           // 회원가입 성공 후 입력 필드 초기화
           setEmail('')
@@ -127,6 +134,48 @@ export default function LoginPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* SNS 로그인 — 각 플랫폼 개발자 계정 등록 및 Supabase 연결 전까지는 클릭 시 에러가 표시된다 */}
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoading}
+                onClick={() => handleSocialLogin('google')}
+                className="w-full h-12 bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              >
+                Google로 계속하기
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoading}
+                onClick={() => handleSocialLogin('apple')}
+                className="w-full h-12 bg-black text-white border-black hover:bg-gray-900 hover:text-white"
+              >
+                Apple로 계속하기
+              </Button>
+              {SHOW_KAKAO_LOGIN && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading}
+                  onClick={() => handleSocialLogin('kakao')}
+                  className="w-full h-12 bg-[#FEE500] text-black border-[#FEE500] hover:bg-[#FDD800] hover:text-black"
+                >
+                  카카오로 계속하기
+                </Button>
+              )}
+            </div>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">또는 이메일로 계속하기</span>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* 이메일 입력 */}
               <div className="space-y-2">
@@ -256,50 +305,6 @@ export default function LoginPage() {
                 {isSignUp ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
               </Button>
             </form>
-
-            {/* SNS 로그인 — 각 플랫폼 개발자 계정 등록 및 Supabase 연결 전까지는 클릭 시 에러가 표시된다 */}
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">또는</span>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isLoading}
-                  onClick={() => handleSocialLogin('google')}
-                  className="w-full h-12 bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                >
-                  Google로 계속하기
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isLoading}
-                  onClick={() => handleSocialLogin('apple')}
-                  className="w-full h-12 bg-black text-white border-black hover:bg-gray-900 hover:text-white"
-                >
-                  Apple로 계속하기
-                </Button>
-                {SHOW_KAKAO_LOGIN && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isLoading}
-                    onClick={() => handleSocialLogin('kakao')}
-                    className="w-full h-12 bg-[#FEE500] text-black border-[#FEE500] hover:bg-[#FDD800] hover:text-black"
-                  >
-                    카카오로 계속하기
-                  </Button>
-                )}
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
