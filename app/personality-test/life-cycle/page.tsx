@@ -1,16 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ChevronLeft, BarChart3, Star, CalendarDays } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { createPersonalityTestResult } from '@/lib/supabase-service'
+import { createPersonalityTestResult, getPersonalityTestContent } from '@/lib/supabase-service'
 import { calculateBirthCard, calculateCurrentAge, calculateFullLifeCycle, MAX_LIFE_CYCLE_AGE } from '@/lib/tarotLifeCycle'
 import LifeCycleChart from '@/components/LifeCycleChart'
-import tarotContent from '@/data/tarot-life-cycle-content.json'
 
 interface TarotCard {
   title: string
@@ -18,8 +17,6 @@ interface TarotCard {
   meaning: string[] // 탄생카드(나의 성향) 설명
   yearCard: string[] // 연도카드(그 해의 흐름) 설명
 }
-
-const cards = tarotContent as unknown as Record<string, TarotCard>
 
 type Step = 'input' | 'result'
 
@@ -39,6 +36,18 @@ export default function LifeCycleTestPage() {
   const [birthCard, setBirthCard] = useState<number | null>(null)
   const [currentAge, setCurrentAge] = useState(0)
   const [focusAge, setFocusAge] = useState(0)
+  const [content, setContent] = useState<Record<string, TarotCard> | null>(null)
+
+  // 콘텐츠는 DB(personality_test_content)에서 조회 — Capacitor 앱 패키징 후에도
+  // 문구 수정 시 앱 재빌드 없이 즉시 반영되도록 하기 위함
+  useEffect(() => {
+    getPersonalityTestContent('life_cycle')
+      .then((data) => setContent(data as Record<string, TarotCard>))
+      .catch((error) => {
+        console.error('Error loading life cycle content:', error)
+        setContent({})
+      })
+  }, [])
 
   const fullData = useMemo(() => {
     if (birthYear === null || birthMonth === null || birthDay === null) return []
@@ -106,8 +115,8 @@ export default function LifeCycleTestPage() {
 
   const back = () => router.back()
 
-  const focusCard = cards[String(fullData[focusAge] ?? '')]
-  const birthCardContent = birthCard !== null ? cards[String(birthCard)] : undefined
+  const focusCard = content?.[String(fullData[focusAge] ?? '')]
+  const birthCardContent = birthCard !== null ? content?.[String(birthCard)] : undefined
 
   const yearAges = [
     { label: '작년', age: Math.max(0, currentAge - 1) },
@@ -228,7 +237,7 @@ export default function LifeCycleTestPage() {
                 >
                   <div className="text-xs text-muted-foreground mb-1">{label}</div>
                   <div className={`font-semibold ${isCenter ? 'text-lg' : 'text-sm'}`}>
-                    {cards[cardKey]?.title ?? `${cardKey}번`}
+                    {content?.[cardKey]?.title ?? `${cardKey}번`}
                   </div>
                 </button>
               )

@@ -1,13 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, Users, Sparkles, ThumbsUp, ThumbsDown, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { createPersonalityTestResult } from '@/lib/supabase-service'
-import enneagramContent from '@/data/enneagram-content.json'
+import { createPersonalityTestResult, getPersonalityTestContent } from '@/lib/supabase-service'
 
 interface EnneagramType {
   title: string
@@ -60,23 +59,34 @@ export default function EnneagramTestPage() {
   const [group2, setGroup2] = useState<Group2Choice | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<{ typeKey: string; content: EnneagramType } | null>(null)
+  const [content, setContent] = useState<Record<string, any> | null>(null)
+
+  // 콘텐츠는 DB(personality_test_content)에서 조회 — Capacitor 앱 패키징 후에도
+  // 문구 수정 시 앱 재빌드 없이 즉시 반영되도록 하기 위함
+  useEffect(() => {
+    getPersonalityTestContent('enneagram')
+      .then(setContent)
+      .catch((error) => {
+        console.error('Error loading enneagram content:', error)
+        setContent({})
+      })
+  }, [])
 
   const handleSubmit = async () => {
-    if (!group1 || !group2) return
+    if (!group1 || !group2 || !content) return
     if (!user?.uid) {
       alert('로그인이 필요합니다.')
       router.push('/login')
       return
     }
 
-    const gridMap = (enneagramContent as any).gridMap as Record<string, string>
-    const types = (enneagramContent as any).types as Record<string, EnneagramType>
+    const gridMap = content.gridMap as Record<string, string> | undefined
     const gridKey = `${group1}-${group2}`
-    const typeKey = gridMap[gridKey]
-    const content = types[typeKey]
+    const typeKey = gridMap?.[gridKey]
+    const typeContent = typeKey ? (content[typeKey] as EnneagramType | undefined) : undefined
 
-    if (!content) {
-      alert('아직 결과 콘텐츠가 준비되지 않았습니다. data/enneagram-content.json을 채워 넣은 후 다시 시도해주세요.')
+    if (!typeKey || !typeContent) {
+      alert('아직 결과 콘텐츠가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.')
       return
     }
 
@@ -88,7 +98,7 @@ export default function EnneagramTestPage() {
         input: { group1, group2 },
         resultKey: typeKey,
       })
-      setResult({ typeKey, content })
+      setResult({ typeKey, content: typeContent })
       setStep('result')
     } catch (error) {
       console.error('Error saving enneagram result:', error)
@@ -183,7 +193,7 @@ export default function EnneagramTestPage() {
             <Button type="button" variant="outline" onClick={() => setStep('group1')} className="flex-1 h-12">
               이전
             </Button>
-            <Button type="button" disabled={!group2 || isSubmitting} onClick={handleSubmit} className="flex-1 h-12">
+            <Button type="button" disabled={!group2 || isSubmitting || !content} onClick={handleSubmit} className="flex-1 h-12">
               {isSubmitting ? (
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />

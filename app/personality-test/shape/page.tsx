@@ -1,14 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, Circle, Triangle, Square, Sparkles, ThumbsUp, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { createPersonalityTestResult } from '@/lib/supabase-service'
+import { createPersonalityTestResult, getPersonalityTestContent } from '@/lib/supabase-service'
 import { ShapeId } from '@/lib/types'
-import shapeContent from '@/data/shape-psychology-content.json'
 
 interface ShapeContent {
   title: string
@@ -43,6 +42,18 @@ export default function ShapePsychologyTestPage() {
   const [order, setOrder] = useState<ShapeId[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<ShapeContent | null>(null)
+  const [content, setContent] = useState<Record<string, ShapeContent> | null>(null)
+
+  // 콘텐츠는 DB(personality_test_content)에서 조회 — Capacitor 앱 패키징 후에도
+  // 문구 수정 시 앱 재빌드 없이 즉시 반영되도록 하기 위함
+  useEffect(() => {
+    getPersonalityTestContent('shape')
+      .then((data) => setContent(data as Record<string, ShapeContent>))
+      .catch((error) => {
+        console.error('Error loading shape psychology content:', error)
+        setContent({})
+      })
+  }, [])
 
   const toggleShape = (id: ShapeId) => {
     if (result) return // 결과 화면에서는 선택 변경 불가 (다시하기로 초기화해야 함)
@@ -50,7 +61,7 @@ export default function ShapePsychologyTestPage() {
   }
 
   const handleSubmit = async () => {
-    if (order.length !== 4) return
+    if (order.length !== 4 || !content) return
     if (!user?.uid) {
       alert('로그인이 필요합니다.')
       router.push('/login')
@@ -58,7 +69,7 @@ export default function ShapePsychologyTestPage() {
     }
 
     const resultKey = order[0]
-    const content = (shapeContent as unknown as Record<string, ShapeContent>)[resultKey]
+    const resultContent = content[resultKey]
 
     setIsSubmitting(true)
     try {
@@ -68,7 +79,7 @@ export default function ShapePsychologyTestPage() {
         input: { order },
         resultKey,
       })
-      setResult(content)
+      setResult(resultContent)
     } catch (error) {
       console.error('Error saving shape psychology result:', error)
       alert('결과 저장에 실패했습니다. 다시 시도해주세요.')
@@ -121,7 +132,7 @@ export default function ShapePsychologyTestPage() {
 
           <Button
             type="button"
-            disabled={order.length !== 4 || isSubmitting}
+            disabled={order.length !== 4 || isSubmitting || !content}
             onClick={handleSubmit}
             className="w-full h-12 text-lg"
           >

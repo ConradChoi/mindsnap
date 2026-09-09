@@ -12,6 +12,7 @@ import {
   getRememberToday,
   getSnaps,
   getPersonalityTestResults,
+  getPersonalityTestContent,
   deleteSnap,
   deleteMoodRecord,
   deleteRememberToday,
@@ -19,9 +20,6 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logTabSwitch } from '@/lib/analytics'
 import { PersonalityTestResult } from '@/lib/types'
-import shapeContent from '@/data/shape-psychology-content.json'
-import enneagramContent from '@/data/enneagram-content.json'
-import tarotContent from '@/data/tarot-life-cycle-content.json'
 
 // 날짜 포맷팅 함수
 const formatDate = (date: Date | any) => {
@@ -446,13 +444,37 @@ const SnapList = ({
   )
 }
 
-// 도형심리 결과 콘텐츠에서 제목만 참조 (본문은 검사 화면에서만 보여줌)
-const shapeTitles = shapeContent as unknown as Record<string, { title: string }>
-const enneagramTypeTitles = (enneagramContent as any).types as Record<string, { title: string }>
-const tarotCardTitles = tarotContent as unknown as Record<string, { title: string }>
+const TEST_TYPE_LABELS: Record<string, string> = {
+  shape: '도형심리',
+  enneagram: '에니어그램',
+  life_cycle: '생일 인생주기',
+}
 
-// 성격 목록 컴포넌트
+// 성격 목록 컴포넌트 — 제목 조회용 콘텐츠는 DB(personality_test_content)에서 가져온다
+// (Capacitor 앱 패키징 후에도 콘텐츠 문구 수정 시 앱 재빌드 없이 반영되도록 하기 위함)
 const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
+  const [titlesByType, setTitlesByType] = useState<Record<string, Record<string, { title: string }>>>({})
+
+  useEffect(() => {
+    const distinctTypes = Array.from(new Set(results.map((r) => r.testType)))
+    distinctTypes.forEach((testType) => {
+      if (titlesByType[testType]) return
+      getPersonalityTestContent(testType)
+        .then((data) => {
+          // 에니어그램은 gridMap 항목도 섞여 있지만 title 조회 시 무시되므로(undefined) 문제 없음
+          setTitlesByType((prev) => ({ ...prev, [testType]: data }))
+        })
+        .catch((error) => console.error(`Error loading ${testType} content:`, error))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results])
+
+  const titleFor = (result: PersonalityTestResult) => {
+    const label = TEST_TYPE_LABELS[result.testType] ?? result.testType
+    const cardTitle = titlesByType[result.testType]?.[result.resultKey]?.title
+    return cardTitle ? `${label} · ${cardTitle}` : `${label} · ${result.resultKey}`
+  }
+
   if (results.length === 0) {
     return (
       <div className="text-center py-12 space-y-4">
@@ -481,15 +503,7 @@ const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
         <Card key={result.id}>
           <CardContent className="py-4 flex items-center justify-between">
             <div>
-              <p className="font-medium text-foreground">
-                {result.testType === 'shape'
-                  ? `도형심리 · ${shapeTitles[result.resultKey]?.title ?? result.resultKey}`
-                  : result.testType === 'enneagram'
-                  ? `에니어그램 · ${enneagramTypeTitles[result.resultKey]?.title ?? result.resultKey}`
-                  : result.testType === 'life_cycle'
-                  ? `생일 인생주기 · ${tarotCardTitles[result.resultKey]?.title ?? result.resultKey}`
-                  : result.testType}
-              </p>
+              <p className="font-medium text-foreground">{titleFor(result)}</p>
               <p className="text-mobile-sm text-muted-foreground mt-1">{formatDate(result.createdAt)}</p>
             </div>
           </CardContent>

@@ -412,8 +412,30 @@ export const restoreRememberToday = async (rememberTodayId: string, userId?: str
 }
 
 // =========================================================
-// 성격 검사 결과 — 도형심리 / 에니어그램 / 생일 인생주기 공통
+// 성격 검사 콘텐츠(설명 문구) — personality_test_content 테이블에서 조회
 // =========================================================
+// content_key -> content(jsonb) 형태의 flat map으로 반환한다.
+// - 도형심리: circle/triangle/square/s
+// - 에니어그램: gridMap(조합->유형 매핑 1건) + type1~type9(유형별 설명)
+// - 생일인생주기: 0~22(카드 번호)
+// 화면 코드가 원래 정적 JSON을 import해서 쓰던 형태와 동일하게 쓸 수 있도록
+// key로 바로 인덱싱 가능한 객체로 변환해서 돌려준다.
+export const getPersonalityTestContent = async (
+  testType: PersonalityTestType
+): Promise<Record<string, any>> => {
+  const { data, error } = await supabase
+    .from('personality_test_content')
+    .select('content_key, content')
+    .eq('test_type', testType)
+
+  if (error) throw error
+
+  const result: Record<string, any> = {}
+  for (const row of data ?? []) {
+    result[row.content_key as string] = row.content
+  }
+  return result
+}
 
 interface CreatePersonalityTestResultInput {
   userId: string
