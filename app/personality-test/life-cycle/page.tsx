@@ -4,17 +4,19 @@ import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ChevronLeft, Sparkles, BarChart3 } from 'lucide-react'
+import { ChevronLeft, BarChart3, Star, CalendarDays } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { createPersonalityTestResult } from '@/lib/supabase-service'
-import { calculateCurrentAge, calculateFullLifeCycle, MAX_LIFE_CYCLE_AGE } from '@/lib/tarotLifeCycle'
+import { calculateBirthCard, calculateCurrentAge, calculateFullLifeCycle, MAX_LIFE_CYCLE_AGE } from '@/lib/tarotLifeCycle'
 import LifeCycleChart from '@/components/LifeCycleChart'
 import tarotContent from '@/data/tarot-life-cycle-content.json'
 
 interface TarotCard {
   title: string
-  meaning: string[]
+  keywords: string[]
+  meaning: string[] // 탄생카드(나의 성향) 설명
+  yearCard: string[] // 연도카드(그 해의 흐름) 설명
 }
 
 const cards = tarotContent as unknown as Record<string, TarotCard>
@@ -34,6 +36,7 @@ export default function LifeCycleTestPage() {
   const [birthYear, setBirthYear] = useState<number | null>(null)
   const [birthMonth, setBirthMonth] = useState<number | null>(null)
   const [birthDay, setBirthDay] = useState<number | null>(null)
+  const [birthCard, setBirthCard] = useState<number | null>(null)
   const [currentAge, setCurrentAge] = useState(0)
   const [focusAge, setFocusAge] = useState(0)
 
@@ -65,8 +68,10 @@ export default function LifeCycleTestPage() {
     const m = Number(month)
     const d = Number(day)
     const age = calculateCurrentAge(y, m, d)
-    const data = calculateFullLifeCycle(y, m, d)
-    const resultKey = String(data[age])
+    const birthCardValue = calculateBirthCard(y, m, d)
+    // 대표 결과값(resultKey)은 나이에 따라 바뀌는 연도카드가 아니라, 평생 변하지 않는
+    // 탄생카드로 저장한다 (도형심리/에니어그램과 동일하게 "나의 성향"을 대표값으로 삼는다).
+    const resultKey = String(birthCardValue)
 
     setIsSubmitting(true)
     try {
@@ -79,6 +84,7 @@ export default function LifeCycleTestPage() {
       setBirthYear(y)
       setBirthMonth(m)
       setBirthDay(d)
+      setBirthCard(birthCardValue)
       setCurrentAge(age)
       setFocusAge(age)
       setStep('result')
@@ -101,6 +107,7 @@ export default function LifeCycleTestPage() {
   const back = () => router.back()
 
   const focusCard = cards[String(fullData[focusAge] ?? '')]
+  const birthCardContent = birthCard !== null ? cards[String(birthCard)] : undefined
 
   const yearAges = [
     { label: '작년', age: Math.max(0, currentAge - 1) },
@@ -178,7 +185,33 @@ export default function LifeCycleTestPage() {
 
       {step === 'result' && (
         <div className="space-y-4">
-          {/* 작년 / 올해 / 내년 카드 */}
+          {/* 탄생 카드 — 생년월일만으로 정해지는, 평생 변하지 않는 나의 성향 */}
+          {birthCardContent && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Star className="w-5 h-5 text-amber-500" />
+                  <span>나의 탄생 카드 · {birthCardContent.title}</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {birthCardContent.keywords.map((kw, i) => (
+                    <span key={i} className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
+                      #{kw}
+                    </span>
+                  ))}
+                </div>
+                <ul className="space-y-1 text-mobile-sm text-muted-foreground list-disc list-inside">
+                  {birthCardContent.meaning.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 작년 / 올해 / 내년 카드 (연도카드 — 나이에 따라 달라지는 그 해의 흐름) */}
           <div className="grid grid-cols-3 gap-2">
             {yearAges.map(({ label, age }) => {
               const cardKey = String(fullData[age] ?? '')
@@ -202,20 +235,27 @@ export default function LifeCycleTestPage() {
             })}
           </div>
 
-          {/* 선택된 나이의 카드 상세 */}
+          {/* 선택된 나이의 연도카드 상세 — 그 해의 흐름 */}
           {focusCard && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
+                  <CalendarDays className="w-5 h-5 text-primary" />
                   <span>
                     {focusAge}세 · {focusCard.title}
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {focusCard.keywords.map((kw, i) => (
+                    <span key={i} className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                      #{kw}
+                    </span>
+                  ))}
+                </div>
                 <ul className="space-y-1 text-mobile-sm text-muted-foreground list-disc list-inside">
-                  {focusCard.meaning.map((line, i) => (
+                  {focusCard.yearCard.map((line, i) => (
                     <li key={i}>{line}</li>
                   ))}
                 </ul>

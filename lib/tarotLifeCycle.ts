@@ -8,8 +8,18 @@ const digitSum = (n: number): number =>
     .split('')
     .reduce((sum, digit) => sum + Number(digit), 0)
 
+// 연도카드: (보려는 해 + 생월 + 생일) — 나이가 늘수록 매년 바뀌는 "그 해의 흐름"
 export const calculateLifeCycleCard = (birthYear: number, birthMonth: number, birthDay: number, age: number): number => {
   let total = birthYear + age + birthMonth + birthDay
+  while (total > 22) {
+    total = digitSum(total)
+  }
+  return total
+}
+
+// 탄생카드: (생년 + 생월 + 생일) — 평생 변하지 않는 "나의 타고난 성향"
+export const calculateBirthCard = (birthYear: number, birthMonth: number, birthDay: number): number => {
+  let total = birthYear + birthMonth + birthDay
   while (total > 22) {
     total = digitSum(total)
   }
