@@ -62,7 +62,7 @@ export default function HomePage() {
                 <span>성격 검사하기</span>
               </CardTitle>
               <p className="text-muted-foreground">
-                도형심리 검사와 에니어그램 검사로 자신을 알아보세요
+                도형심리, 에니어그램, 생일로 보는 인생주기로 자신을 알아보세요
               </p>
             </CardHeader>
           </Card>
