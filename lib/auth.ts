@@ -1,7 +1,14 @@
 import type { Session, User as SupabaseUser } from '@supabase/supabase-js'
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
 import { supabase } from './supabase'
 import { updateUserNickname } from './supabase-service'
 import { logUserActivity, ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from './analytics'
+
+// 네이티브 앱(Capacitor) 소셜 로그인 완료 후 시스템 브라우저가 돌아오는 커스텀 URL 스킴.
+// Supabase 대시보드(Authentication > URL Configuration > Redirect URLs)에 동일한 값이
+// 등록되어 있어야 한다.
+const NATIVE_AUTH_REDIRECT_URL = 'io.ylia.mindsnap://auth-callback'
 
 // Supabase Auth 에러 메시지를 한글 안내 문구로 변환한다.
 // Supabase가 반환하는 원문 메시지는 영어 고정이라(버전에 따라 표현이 조금씩 다를 수 있어
@@ -83,6 +90,28 @@ export const signInWithEmail = async (email: string, password: string) => {
 export type SocialProvider = 'google' | 'apple' | 'kakao'
 
 export const signInWithProvider = async (provider: SocialProvider) => {
+  // 네이티브 앱: Google이 임베디드 웹뷰 내 OAuth 로그인을 정책상 차단하기 때문에(Apple도 동일하게
+  // 권장), Capacitor WebView 안에서 바로 리다이렉트하지 않고 시스템 브라우저(SFSafariViewController/
+  // Custom Tabs)를 띄운다. 로그인 완료 후에는 커스텀 URL 스킴 딥링크로 앱에 돌아오고,
+  // handleNativeAuthDeepLink()가 code를 세션으로 교환한다.
+  if (Capacitor.isNativePlatform()) {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: NATIVE_AUTH_REDIRECT_URL,
+        skipBrowserRedirect: true,
+      },
+    })
+
+    if (error || !data.url) {
+      return { error: translateAuthError(error) }
+    }
+
+    await Browser.open({ url: data.url, presentationStyle: 'popover' })
+    return { error: null }
+  }
+
+  // 웹: 기존과 동일하게 현재 페이지 자체가 리다이렉트된다.
   const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
 
   const { error } = await supabase.auth.signInWithOAuth({
@@ -95,6 +124,37 @@ export const signInWithProvider = async (provider: SocialProvider) => {
   }
 
   return { error: null }
+}
+
+// 네이티브 앱에서 소셜 로그인 완료 후 돌아온 딥링크(io.ylia.mindsnap://auth-callback?code=...)를
+// 처리한다. AuthContext가 @capacitor/app의 appUrlOpen 이벤트에서 호출한다.
+// 반환값은 "이 URL이 우리 딥링크였는지" 여부 — appUrlOpen은 다른 목적의 딥링크에도 발생할 수 있어
+// 호출부에서 이 값으로 추가 처리(예: 다른 라우팅) 여부를 판단할 수 있게 한다.
+export const handleNativeAuthDeepLink = async (url: string): Promise<boolean> => {
+  if (!url.startsWith(NATIVE_AUTH_REDIRECT_URL)) {
+    return false
+  }
+
+  try {
+    const code = new URL(url).searchParams.get('code')
+    if (!code) {
+      console.warn('네이티브 로그인 딥링크에 code 파라미터가 없습니다:', url)
+      return true
+    }
+
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) {
+      console.error('네이티브 로그인 세션 교환 실패:', translateAuthError(error))
+    }
+  } catch (error) {
+    console.error('네이티브 로그인 딥링크 처리 중 오류:', error)
+  } finally {
+    // 시스템 브라우저(SFSafariViewController/Custom Tabs)가 열려 있었다면 닫는다.
+    // 이미 닫혀 있는 경우(사용자가 직접 닫음)에도 에러 없이 무시된다.
+    await Browser.close().catch(() => undefined)
+  }
+
+  return true
 }
 
 // 이메일/비밀번호로 회원가입

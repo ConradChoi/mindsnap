@@ -25,6 +25,13 @@ export const supabase: SupabaseClient = createClient(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
+      // Capacitor(iOS/Android) 앱에서는 소셜 로그인이 시스템 브라우저 → 커스텀 URL 스킴 딥링크로
+      // 앱에 돌아오는 방식이라(웹처럼 페이지 자체가 리다이렉트되지 않음), 리다이렉트 URL에 세션을
+      // 바로 담아 보내는 implicit 플로우 대신 code를 받아 exchangeCodeForSession()으로 직접
+      // 교환하는 PKCE 플로우가 필요하다. 웹 로그인(이메일/Google/Apple)도 이 설정을 그대로 쓰지만
+      // 동작 방식은 동일하다(signInWithOAuth 호출 시 내부적으로 code_verifier를 저장해뒀다가
+      // 콜백에서 code와 함께 교환).
+      flowType: 'pkce',
     },
   }
 )
