@@ -9,6 +9,8 @@ import { EventBanner } from '@/components/ui/banner'
 import { useAuth } from '@/contexts/AuthContext'
 import { signOutUser } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
+import { Capacitor } from '@capacitor/core'
+import { App as CapacitorApp } from '@capacitor/app'
 
 interface MobileShellProps {
   children: React.ReactNode
@@ -47,6 +49,27 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
       router.push('/login')
     }
   }, [loading, user, pathname, router])
+
+  // Android 하드웨어 뒤로가기 버튼 처리.
+  // 홈('/')에서는 이 앱의 최상위 화면이므로 바로 종료하고, 그 외 화면에서는 브라우저 히스토리가
+  // 있으면 뒤로 이동, 없으면(딥링크로 바로 진입한 경우 등) 홈으로 보낸다.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const listenerHandle = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (pathname === '/') {
+        CapacitorApp.exitApp()
+      } else if (canGoBack) {
+        router.back()
+      } else {
+        router.push('/')
+      }
+    })
+
+    return () => {
+      listenerHandle.then((handle) => handle.remove())
+    }
+  }, [pathname, router])
 
   // 로딩 중일 때는 로딩 화면 표시
   if (loading) {
