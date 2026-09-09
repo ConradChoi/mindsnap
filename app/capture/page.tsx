@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Camera, Save, Tag, X, Upload, Mic, MicOff, Play, Square } from 'lucide-react'
+import { Camera as CameraIcon, Save, Tag, X, Upload, Mic, MicOff, Play, Square } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createSnap } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logUserActivity, ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from '@/lib/analytics'
+import { Camera, MediaTypeSelection } from '@capacitor/camera'
 
 // Web Speech API 타입 정의
 interface SpeechRecognition extends EventTarget {
@@ -98,174 +99,59 @@ export default function CapturePage() {
     }
   }, [user])
 
-  const handleTakePhoto = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment', // 후면 카메라 우선
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        } 
-      })
-      
-      // 카메라 스트림을 비디오 요소에 연결
-      const video = document.createElement('video')
-      video.srcObject = stream
-      video.autoplay = true
-      video.style.width = '100%'
-      video.style.height = '100%'
-      video.style.objectFit = 'cover'
-      
-      // 카메라 모달 생성
-      const modal = document.createElement('div')
-      modal.style.position = 'fixed'
-      modal.style.top = '0'
-      modal.style.left = '0'
-      modal.style.width = '100%'
-      modal.style.height = '100%'
-      modal.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'
-      modal.style.zIndex = '9999'
-      modal.style.display = 'flex'
-      modal.style.flexDirection = 'column'
-      modal.style.alignItems = 'center'
-      modal.style.justifyContent = 'center'
-      
-      // 카메라 뷰어 컨테이너
-      const cameraContainer = document.createElement('div')
-      cameraContainer.style.width = '90%'
-      cameraContainer.style.maxWidth = '500px'
-      cameraContainer.style.height = '400px'
-      cameraContainer.style.position = 'relative'
-      cameraContainer.style.borderRadius = '12px'
-      cameraContainer.style.overflow = 'hidden'
-      cameraContainer.style.backgroundColor = '#000'
-      
-      // 카메라 뷰어에 비디오 추가
-      cameraContainer.appendChild(video)
-      
-      // 촬영 버튼
-      const captureButton = document.createElement('button')
-      captureButton.innerHTML = '📸 촬영'
-      captureButton.style.position = 'absolute'
-      captureButton.style.bottom = '20px'
-      captureButton.style.left = '50%'
-      captureButton.style.transform = 'translateX(-50%)'
-      captureButton.style.padding = '12px 24px'
-      captureButton.style.backgroundColor = '#fff'
-      captureButton.style.color = '#000'
-      captureButton.style.border = 'none'
-      captureButton.style.borderRadius = '25px'
-      captureButton.style.fontSize = '16px'
-      captureButton.style.fontWeight = 'bold'
-      captureButton.style.cursor = 'pointer'
-      captureButton.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)'
-      
-      // 취소 버튼
-      const cancelButton = document.createElement('button')
-      cancelButton.innerHTML = '❌ 취소'
-      cancelButton.style.position = 'absolute'
-      cancelButton.style.top = '20px'
-      cancelButton.style.right = '20px'
-      cancelButton.style.padding = '8px 16px'
-      cancelButton.style.backgroundColor = 'rgba(255,255,255,0.2)'
-      cancelButton.style.color = '#fff'
-      cancelButton.style.border = 'none'
-      cancelButton.style.borderRadius = '20px'
-      cancelButton.style.fontSize = '14px'
-      cancelButton.style.cursor = 'pointer'
-      
-      // 카메라 뷰어에 버튼들 추가
-      cameraContainer.appendChild(captureButton)
-      cameraContainer.appendChild(cancelButton)
-      
-      // 모달에 카메라 뷰어 추가
-      modal.appendChild(cameraContainer)
-      document.body.appendChild(modal)
-      
-      // 촬영 버튼 클릭 이벤트
-      captureButton.onclick = () => {
-        // 캔버스 생성하여 비디오 프레임 캡처
-        const canvas = document.createElement('canvas')
-        const context = canvas.getContext('2d')
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        
-        if (context) {
-          context.drawImage(video, 0, 0, canvas.width, canvas.height)
-          
-          // 캔버스를 Blob으로 변환
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const url = URL.createObjectURL(blob)
-              setSelectedImage(url) // 미리보기 전용 (DB에는 저장하지 않음)
-              setSelectedImageFile(blob) // 업로드용 원본 Blob
+  const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 
-              // 모달 제거 및 스트림 정리
-              document.body.removeChild(modal)
-              stream.getTracks().forEach(track => track.stop())
-            }
-          }, 'image/jpeg', 0.8)
-        }
+  // Capacitor Camera 플러그인이 반환하는 webPath(네이티브에서는 capacitor:// 스킴,
+  // 웹 폴백에서는 blob: URL)를 fetch로 읽어 실제 업로드용 Blob으로 변환한다.
+  // selectedImage(미리보기)에는 webPath를 그대로 쓰고, DB에는 절대 저장하지 않는다(T4 원칙 유지).
+  const applyPickedImage = async (webPath: string | undefined) => {
+    if (!webPath) return
+
+    try {
+      const response = await fetch(webPath)
+      const blob = await response.blob()
+
+      if (blob.size > MAX_IMAGE_SIZE_BYTES) {
+        alert('파일 크기는 10MB 이하여야 합니다.')
+        return
       }
-      
-      // 취소 버튼 클릭 이벤트
-      cancelButton.onclick = () => {
-        document.body.removeChild(modal)
-        stream.getTracks().forEach(track => track.stop())
-      }
-      
-      // 모달 외부 클릭 시 닫기
-      modal.onclick = (e) => {
-        if (e.target === modal) {
-          document.body.removeChild(modal)
-          stream.getTracks().forEach(track => track.stop())
-        }
-      }
-      
+
+      setSelectedImage(webPath)
+      setSelectedImageFile(blob)
     } catch (error) {
-      console.error('카메라에 접근할 수 없습니다:', error)
-      alert('카메라 권한이 필요하거나 카메라를 사용할 수 없습니다.')
+      console.error('이미지를 불러오지 못했습니다:', error)
+      alert('선택한 이미지를 불러오지 못했습니다. 다시 시도해주세요.')
     }
   }
 
-  const handleSelectPhoto = () => {
-    // 파일 입력 요소 생성
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.style.display = 'none'
-    
-    // 파일 선택 이벤트
-    input.onchange = (e) => {
-      const target = e.target as HTMLInputElement
-      if (target.files && target.files[0]) {
-        const file = target.files[0]
-        
-        // 파일 크기 검증 (10MB 이하)
-        if (file.size > 10 * 1024 * 1024) {
-          alert('파일 크기는 10MB 이하여야 합니다.')
-          return
-        }
-        
-        // 파일 타입 검증
-        if (!file.type.startsWith('image/')) {
-          alert('이미지 파일만 선택할 수 있습니다.')
-          return
-        }
-        
-        // 파일을 URL로 변환하여 미리보기 이미지 설정 (DB에는 저장하지 않음)
-        const url = URL.createObjectURL(file)
-        setSelectedImage(url)
-        setSelectedImageFile(file) // 업로드용 원본 File
-
-        // 파일 입력 요소 제거
-        document.body.removeChild(input)
-      }
+  // 후면 카메라로 즉시 촬영 (iOS/Android: 네이티브 카메라 UI, 웹: 파일 입력 폴백)
+  const handleTakePhoto = async () => {
+    try {
+      const result = await Camera.takePhoto({
+        quality: 80,
+        editable: 'no',
+        saveToGallery: false,
+        correctOrientation: true,
+      })
+      await applyPickedImage(result.webPath)
+    } catch (error) {
+      // 사용자가 촬영을 취소한 경우도 이 catch로 들어오므로 별도 alert는 띄우지 않는다
+      console.warn('카메라 촬영이 취소되었거나 실패했습니다:', error)
     }
-    
-    // 파일 선택 다이얼로그 열기
-    document.body.appendChild(input)
-    input.click()
+  }
+
+  // 갤러리에서 사진 선택
+  const handleSelectPhoto = async () => {
+    try {
+      const result = await Camera.chooseFromGallery({
+        mediaType: MediaTypeSelection.Photo,
+        allowMultipleSelection: false,
+      })
+      await applyPickedImage(result.results[0]?.webPath)
+    } catch (error) {
+      // 사용자가 선택을 취소한 경우도 이 catch로 들어오므로 별도 alert는 띄우지 않는다
+      console.warn('사진 선택이 취소되었거나 실패했습니다:', error)
+    }
   }
 
   // 음성 녹음 시작
@@ -623,7 +509,7 @@ export default function CapturePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Camera className="w-5 h-5 text-primary" />
+              <CameraIcon className="w-5 h-5 text-primary" />
               <span>스냅 정보</span>
             </CardTitle>
           </CardHeader>
@@ -787,7 +673,7 @@ export default function CapturePage() {
                 ) : (
                   <div className="border-2 border-dashed border-input rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
                     <div className="space-y-3">
-                      <Camera className="w-12 h-12 text-muted-foreground mx-auto" />
+                      <CameraIcon className="w-12 h-12 text-muted-foreground mx-auto" />
                       <div>
                         <p className="text-sm font-medium text-foreground">사진을 추가해보세요</p>
                         <p className="text-xs text-muted-foreground mt-1">
@@ -802,7 +688,7 @@ export default function CapturePage() {
                           onClick={handleTakePhoto}
                           className="flex-1"
                         >
-                          <Camera className="w-4 h-4 mr-2" />
+                          <CameraIcon className="w-4 h-4 mr-2" />
                           촬영
                         </Button>
                         <Button
