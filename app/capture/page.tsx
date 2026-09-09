@@ -4,67 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Camera as CameraIcon, Save, Tag, X, Upload, Mic, MicOff, Play, Square } from 'lucide-react'
+import { Camera as CameraIcon, Save, Tag, X, Upload, Mic, Play, Square } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createSnap } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logUserActivity, ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from '@/lib/analytics'
 import { Camera, MediaTypeSelection } from '@capacitor/camera'
 import { VoiceRecorder } from 'capacitor-voice-recorder'
-
-// Web Speech API 타입 정의
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  maxAlternatives: number
-  start(): void
-  stop(): void
-  abort(): void
-  onresult: ((event: SpeechRecognitionEvent) => void) | null
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
-  onend: (() => void) | null
-  onstart: (() => void) | null
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList
-  resultIndex: number
-}
-
-interface SpeechRecognitionResultList {
-  length: number
-  item(index: number): SpeechRecognitionResult
-  [index: number]: SpeechRecognitionResult
-}
-
-interface SpeechRecognitionResult {
-  length: number
-  item(index: number): SpeechRecognitionAlternative
-  [index: number]: SpeechRecognitionAlternative
-  isFinal: boolean
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string
-  confidence: number
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string
-  message: string
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: {
-      new (): SpeechRecognition
-    }
-    webkitSpeechRecognition: {
-      new (): SpeechRecognition
-    }
-  }
-}
+import { SpeechRecognition } from '@capacitor-community/speech-recognition'
 
 export default function CapturePage() {
   const router = useRouter()
@@ -238,7 +185,7 @@ export default function CapturePage() {
       }
 
       // 녹음 완료 후 바로 음성 인식 시작 (간단한 방식)
-      startSimpleSpeechRecognition()
+      startSpeechToText()
     } catch (error) {
       console.error('음성 녹음 중지 실패:', error)
       setIsRecording(false)
@@ -275,185 +222,79 @@ export default function CapturePage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // 음성-텍스트 변환 (Web Speech API 사용)
-  const transcribeAudio = async (audioBlob: Blob) => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('이 브라우저는 음성 인식을 지원하지 않습니다.')
-      return
-    }
-
-    setIsTranscribing(true)
-    setTranscriptionProgress('음성을 텍스트로 변환 중...')
-
-    try {
-      // 오디오 파일 크기 확인
-      if (audioBlob.size === 0) {
-        throw new Error('녹음된 오디오 데이터가 없습니다.')
-      }
-
-      console.log('Audio blob size:', audioBlob.size, 'type:', audioBlob.type)
-
-      // 간단한 직접 음성 인식 방식 사용
-      await startDirectSpeechRecognition()
-      
-    } catch (error) {
-      console.error('음성-텍스트 변환 오류:', error)
-      setTranscriptionProgress('변환 실패')
-      setIsTranscribing(false)
-      
-      // 오류 시 수동 입력 안내
-      const manualText = prompt('음성-텍스트 변환에 실패했습니다. 직접 입력해주세요:')
-      if (manualText) {
-        setTranscriptionText(manualText)
-        setNote(prev => {
-          const separator = prev.trim() ? '\n\n' : ''
-          return prev + separator + `🎤 음성 메모: ${manualText}`
-        })
-      }
+  // 음성 인식 실패 시 수동 입력으로 대체 안내
+  const promptManualTranscription = () => {
+    const manualText = prompt('음성 인식에 실패했습니다. 직접 입력해주세요:')
+    if (manualText) {
+      setTranscriptionText(manualText)
+      setNote(prev => {
+        const separator = prev.trim() ? '\n\n' : ''
+        return prev + separator + `🎤 음성 메모: ${manualText}`
+      })
     }
   }
 
-  // 간단한 음성 인식 (녹음 완료 후 바로 시작)
-  const startSimpleSpeechRecognition = () => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('이 브라우저는 음성 인식을 지원하지 않습니다.')
-      return
-    }
-
+  // 음성-텍스트 변환 (@capacitor-community/speech-recognition 사용).
+  // iOS WKWebView에서는 Web Speech API가 아예 동작하지 않아 네이티브 STT 플러그인으로 대체했다.
+  // 녹음 완료 직후 바로 재청취해서 변환하는 방식(원래 웹 버전과 동일한 UX)을 유지한다.
+  const startSpeechToText = async () => {
     setIsTranscribing(true)
     setTranscriptionProgress('음성 인식 중... (다시 말씀해주세요)')
 
     try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      const recognition = new SpeechRecognition()
-      
-      recognition.lang = 'ko-KR'
-      recognition.continuous = false
-      recognition.interimResults = false
-      recognition.maxAlternatives = 1
-      
-      recognition.onstart = () => {
-        console.log('음성 인식 시작됨')
-        setTranscriptionProgress('음성 인식 중...')
+      const { available } = await SpeechRecognition.available()
+      if (!available) {
+        throw new Error('이 기기는 음성 인식을 지원하지 않습니다.')
       }
-      
-      recognition.onresult = async (event) => {
-        console.log('음성 인식 결과:', event.results)
-        const transcript = event.results[0][0].transcript
-        console.log('인식된 텍스트:', transcript)
-        
-        setTranscriptionText(transcript)
-        setTranscriptionProgress('변환 완료!')
-        
-        // 음성-텍스트 변환 성공 로깅
-        if (user?.uid) {
-          await logUserActivity(
-            user.uid,
-            ACTIVITY_ACTIONS.SPEECH_TO_TEXT,
-            ACTIVITY_CATEGORIES.CAPTURE,
-            {
-              transcriptLength: transcript.length,
-              success: true,
-              timestamp: new Date().toISOString()
-            }
-          )
-        }
-        
-        // 메모 영역에 변환된 텍스트 추가
-        setNote(prev => {
-          const separator = prev.trim() ? '\n\n' : ''
-          const newText = prev + separator + `🎤 음성 메모: ${transcript}`
-          console.log('메모에 추가된 텍스트:', newText)
-          return newText
-        })
-      }
-      
-      recognition.onerror = (event) => {
-        console.error('음성 인식 오류:', event.error)
-        setTranscriptionProgress('음성 인식 실패')
-        
-        const manualText = prompt('음성 인식에 실패했습니다. 직접 입력해주세요:')
-        if (manualText) {
-          setTranscriptionText(manualText)
-          setNote(prev => {
-            const separator = prev.trim() ? '\n\n' : ''
-            return prev + separator + `🎤 음성 메모: ${manualText}`
-          })
+
+      const permission = await SpeechRecognition.checkPermissions()
+      if (permission.speechRecognition !== 'granted') {
+        const requested = await SpeechRecognition.requestPermissions()
+        if (requested.speechRecognition !== 'granted') {
+          throw new Error('음성 인식 권한이 필요합니다.')
         }
       }
-      
-      recognition.onend = () => {
-        console.log('음성 인식 종료됨')
-        setIsTranscribing(false)
+
+      const { matches } = await SpeechRecognition.start({
+        language: 'ko-KR',
+        maxResults: 1,
+        partialResults: false,
+        popup: false,
+      })
+
+      const transcript = matches?.[0]
+      if (!transcript) {
+        throw new Error('인식된 텍스트가 없습니다.')
       }
-      
-      console.log('음성 인식 시작 중...')
-      recognition.start()
+
+      setTranscriptionText(transcript)
+      setTranscriptionProgress('변환 완료!')
+
+      // 음성-텍스트 변환 성공 로깅
+      if (user?.uid) {
+        await logUserActivity(
+          user.uid,
+          ACTIVITY_ACTIONS.SPEECH_TO_TEXT,
+          ACTIVITY_CATEGORIES.CAPTURE,
+          {
+            transcriptLength: transcript.length,
+            success: true,
+            timestamp: new Date().toISOString()
+          }
+        )
+      }
+
+      // 메모 영역에 변환된 텍스트 추가
+      setNote(prev => {
+        const separator = prev.trim() ? '\n\n' : ''
+        return prev + separator + `🎤 음성 메모: ${transcript}`
+      })
     } catch (error) {
       console.error('음성 인식 오류:', error)
-      setIsTranscribing(false)
       setTranscriptionProgress('음성 인식 실패')
-    }
-  }
-
-  // 직접 음성 인식 (오디오 재생 없이)
-  const startDirectSpeechRecognition = async () => {
-    try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      const recognition = new SpeechRecognition()
-      
-      recognition.lang = 'ko-KR'
-      recognition.continuous = false
-      recognition.interimResults = false
-      recognition.maxAlternatives = 1
-      
-      recognition.onstart = () => {
-        setTranscriptionProgress('음성 인식 중... (다시 말씀해주세요)')
-        console.log('음성 인식 시작됨')
-      }
-      
-      recognition.onresult = (event) => {
-        console.log('음성 인식 결과:', event.results)
-        const transcript = event.results[0][0].transcript
-        console.log('인식된 텍스트:', transcript)
-        
-        setTranscriptionText(transcript)
-        setTranscriptionProgress('변환 완료!')
-        
-        // 메모 영역에 변환된 텍스트 추가
-        setNote(prev => {
-          const separator = prev.trim() ? '\n\n' : ''
-          const newText = prev + separator + `🎤 음성 메모: ${transcript}`
-          console.log('메모에 추가된 텍스트:', newText)
-          return newText
-        })
-      }
-      
-      recognition.onerror = (event) => {
-        console.error('직접 음성 인식 오류:', event.error)
-        setTranscriptionProgress('음성 인식 실패')
-        
-        const manualText = prompt('음성 인식에 실패했습니다. 직접 입력해주세요:')
-        if (manualText) {
-          setTranscriptionText(manualText)
-          setNote(prev => {
-            const separator = prev.trim() ? '\n\n' : ''
-            return prev + separator + `🎤 음성 메모: ${manualText}`
-          })
-        }
-      }
-      
-      recognition.onend = () => {
-        console.log('음성 인식 종료됨')
-        setIsTranscribing(false)
-      }
-      
-      console.log('음성 인식 시작 중...')
-      recognition.start()
-    } catch (error) {
-      console.error('직접 음성 인식 오류:', error)
+      promptManualTranscription()
+    } finally {
       setIsTranscribing(false)
-      setTranscriptionProgress('음성 인식 실패')
     }
   }
 
