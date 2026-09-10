@@ -9,6 +9,11 @@ export interface BannerProps {
   title: string
   description?: string
   onClose?: () => void
+  // "닫기"로 접힌 뒤 나오는 작은 재표시 링크(reopen button)를 완전히 닫을 때 호출된다.
+  onDismissReopen?: () => void
+  // 마운트 시점의 초기 상태. 둘 다 없으면 기존과 동일하게 풀배너부터 시작한다.
+  initiallyCollapsed?: boolean
+  initiallyHidden?: boolean
   className?: string
   closable?: boolean
   showReopenButton?: boolean
@@ -47,13 +52,17 @@ export function Banner({
   title,
   description,
   onClose,
+  onDismissReopen,
+  initiallyCollapsed = false,
+  initiallyHidden = false,
   className,
   closable = true,
   showReopenButton = false,
   reopenButtonText = "다시 보기"
 }: BannerProps) {
-  const [isVisible, setIsVisible] = useState(true)
-  const [shouldRender, setShouldRender] = useState(true)
+  const [isVisible, setIsVisible] = useState(!initiallyCollapsed)
+  const [shouldRender, setShouldRender] = useState(!initiallyCollapsed)
+  const [fullyDismissed, setFullyDismissed] = useState(initiallyHidden)
   const config = bannerConfig[type]
   const Icon = config.icon
 
@@ -71,17 +80,36 @@ export function Banner({
     setIsVisible(true)
   }
 
+  const handleDismissReopen = () => {
+    setFullyDismissed(true)
+    onDismissReopen?.()
+  }
+
+  // 완전히 닫힘 — 재표시 링크까지 사용자가 닫은 상태. 아무것도 렌더링하지 않는다.
+  if (fullyDismissed) {
+    return null
+  }
+
   if (!shouldRender) {
     // 재표시 버튼이 활성화된 경우에만 버튼 표시
     if (showReopenButton) {
       return (
-        <div className="bg-muted/50 px-4 py-2 text-center">
+        <div className="bg-muted/50 px-4 py-2 flex items-center justify-center gap-1">
           <button
             onClick={handleReopen}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             📢 {reopenButtonText}
           </button>
+          {onDismissReopen && (
+            <button
+              onClick={handleDismissReopen}
+              aria-label="공지 영역 완전히 닫기"
+              className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       )
     }
@@ -124,13 +152,23 @@ export function Banner({
 }
 
 // 특정 용도별 배너 컴포넌트들
-export function EventBanner({ title, description, onClose }: Omit<BannerProps, 'type'>) {
+export function EventBanner({
+  title,
+  description,
+  onClose,
+  onDismissReopen,
+  initiallyCollapsed,
+  initiallyHidden,
+}: Omit<BannerProps, 'type'>) {
   return (
     <Banner
       type="event"
       title={title}
       description={description}
       onClose={onClose}
+      onDismissReopen={onDismissReopen}
+      initiallyCollapsed={initiallyCollapsed}
+      initiallyHidden={initiallyHidden}
       showReopenButton={true}
       reopenButtonText="공지사항 보기"
     />

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Camera, BookOpen, Settings, Home, PenTool, LogOut } from 'lucide-react'
@@ -21,9 +21,27 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
   const { user, loading } = useAuth()
   const router = useRouter()
 
-  // 배너 닫기 처리 (로컬 스토리지에 상태 저장)
+  // 공지 배너 상태 — localStorage에서 로드하기 전까지는 렌더링하지 않는다(bannerLoaded).
+  // 이렇게 안 하면 Banner가 기본값(풀배너)으로 먼저 마운트된 뒤 저장된 상태로 바뀌면서
+  // 화면이 한 번 깜빡이게 된다.
+  const [bannerLoaded, setBannerLoaded] = useState(false)
+  const [bannerCollapsed, setBannerCollapsed] = useState(false)
+  const [bannerHidden, setBannerHidden] = useState(false)
+
+  useEffect(() => {
+    setBannerHidden(localStorage.getItem('mindsnap_banner_hidden') === 'true')
+    setBannerCollapsed(localStorage.getItem('mindsnap_banner_closed') === 'true')
+    setBannerLoaded(true)
+  }, [])
+
+  // 배너 "닫기" — 풀배너를 접어서 작은 "공지사항 보기" 링크로 바꾼다
   const handleBannerClose = () => {
     localStorage.setItem('mindsnap_banner_closed', 'true')
+  }
+
+  // "공지사항 보기" 링크의 X — 그 링크마저 완전히 숨긴다
+  const handleBannerDismiss = () => {
+    localStorage.setItem('mindsnap_banner_hidden', 'true')
   }
 
   // 로그아웃 처리
@@ -101,11 +119,16 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
     // 흔들리는 오래된 문제가 있어 피한다.)
     <div className="h-dvh bg-background flex flex-col pt-safe-top overflow-hidden">
       {/* 상단 배너 영역 */}
-      <EventBanner
-        title="🎉 새로운 기능이 추가되었습니다!"
-        description="마음 기록과 성격 검사 기능을 체험해보세요"
-        onClose={handleBannerClose}
-      />
+      {bannerLoaded && (
+        <EventBanner
+          title="🎉 새로운 기능이 추가되었습니다!"
+          description="마음 기록과 성격 검사 기능을 체험해보세요"
+          onClose={handleBannerClose}
+          onDismissReopen={handleBannerDismiss}
+          initiallyCollapsed={bannerCollapsed}
+          initiallyHidden={bannerHidden}
+        />
+      )}
 
       {/* 메인 콘텐츠 — 이 영역만 스크롤된다 */}
       <main className="flex-1 min-h-0 overflow-y-auto container px-4 py-6 pb-safe-bottom">
