@@ -124,7 +124,7 @@ export default function DailyMoodPage() {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="오늘 하루의 마음 상태나 감정을 자세히 기록해보세요"
-                className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               />
             </div>
           </CardContent>

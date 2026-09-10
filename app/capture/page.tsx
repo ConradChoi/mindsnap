@@ -376,7 +376,7 @@ export default function CapturePage() {
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="추가적인 메모가 있다면 입력하세요"
-                  className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 />
                 
                 {/* 음성 녹음 영역 */}

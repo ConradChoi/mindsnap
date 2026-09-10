@@ -266,7 +266,7 @@ export default function RememberTodayPage() {
             value={data.step1.memorableEvent}
             onChange={(e) => updateData('step1', 'memorableEvent', e.target.value)}
             placeholder="오늘 하루 중 가장 인상깊었던 일을 자세히 적어보세요 (10글자 이상)"
-            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
               data.step1.memorableEvent.length > 0 && data.step1.memorableEvent.length < 10
                 ? 'border-red-300 focus:ring-red-200'
                 : data.step1.memorableEvent.length >= 10
@@ -315,7 +315,7 @@ export default function RememberTodayPage() {
             value={data.step2.reason}
             onChange={(e) => updateData('step2', 'reason', e.target.value)}
             placeholder="그 일이 왜 인상깊었는지 생각해보세요 (10글자 이상)"
-            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
               data.step2.reason.length > 0 && data.step2.reason.length < 10
                 ? 'border-red-300 focus:ring-red-200'
                 : data.step2.reason.length >= 10
@@ -364,7 +364,7 @@ export default function RememberTodayPage() {
             value={data.step3.cause}
             onChange={(e) => updateData('step3', 'cause', e.target.value)}
             placeholder="그런 감정이나 생각을 만든 원인을 찾아보세요 (10글자 이상)"
-            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             maxLength={500}
           />
           <div className="text-xs text-muted-foreground text-right">
@@ -393,7 +393,7 @@ export default function RememberTodayPage() {
             value={data.step4.improvement}
             onChange={(e) => updateData('step4', 'improvement', e.target.value)}
             placeholder="앞으로 더 나은 방향으로 나아갈 방법을 생각해보세요 (10글자 이상)"
-            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             maxLength={500}
           />
           <div className="text-xs text-muted-foreground text-right">
@@ -422,7 +422,7 @@ export default function RememberTodayPage() {
             value={data.step5.action}
             onChange={(e) => updateData('step5', 'action', e.target.value)}
             placeholder="지금 당장 할 수 있는 구체적인 행동을 적어보세요 (10글자 이상)"
-            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="w-full h-24 px-3 py-2 border border-input rounded-md bg-background text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             maxLength={500}
           />
           <div className="text-xs text-muted-foreground text-right">
@@ -451,7 +451,7 @@ export default function RememberTodayPage() {
             value={data.step6.summary}
             onChange={(e) => updateData('step6', 'summary', e.target.value)}
             placeholder="오늘 하루를 한 문장으로 요약해보세요 (5글자 이상)"
-            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+            className={`w-full h-24 px-3 py-2 border rounded-md bg-background text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
               data.step6.summary.length > 0 && data.step6.summary.length < 5
                 ? 'border-red-300 focus:ring-red-200'
                 : data.step6.summary.length >= 5
@@ -514,7 +514,7 @@ export default function RememberTodayPage() {
                   showDateSelectionNotification(e.target.value)
                 }
               }}
-              className="w-full h-12 px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 pr-12"
+              className="w-full h-12 px-3 py-2 border border-input rounded-md bg-background text-base focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 pr-12"
               required
             />
             {/* 달력 아이콘 */}

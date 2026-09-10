@@ -9,6 +9,9 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signInWithEmail, signUpWithEmail, signInWithProvider, type SocialProvider } from '@/lib/auth'
 import EmailFindModal from '@/components/EmailFindModal'
+import { useAuth } from '@/contexts/AuthContext'
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
 
 // 카카오는 이메일 동의항목이 "비즈 앱 전환" 후에만 신청 가능해(카카오 정책) 현재 Supabase에서
 // 비활성화 상태다. 코드는 남겨두고 버튼만 숨긴다 — 비즈 앱 전환 완료되면 이 값만 true로 바꾸면 된다.
@@ -17,6 +20,7 @@ const SHOW_KAKAO_LOGIN = false
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -28,6 +32,32 @@ export default function LoginPage() {
   const [isEmailFindModalOpen, setIsEmailFindModalOpen] = useState(false)
   const [isPasswordResetModalOpen, setIsPasswordResetModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'email-find' | 'password-reset'>('email-find')
+
+  // 로그인 성공 시 홈으로 이동. 웹에서는 페이지 전체 리다이렉트로 화면이 새로 열려서
+  // 이 처리가 원래 필요 없었지만, 네이티브 앱의 소셜 로그인은 시스템 브라우저 →
+  // 커스텀 URL 스킴 딥링크로 돌아오는 방식이라 페이지가 리로드되지 않는다.
+  // AuthContext의 user 상태가 바뀌는 시점(딥링크로 세션 발급 완료)에 맞춰 직접 이동시킨다.
+  useEffect(() => {
+    if (user) {
+      router.push('/')
+    }
+  }, [user, router])
+
+  // 네이티브 앱: 시스템 브라우저가 닫히는 시점(로그인 완료로 우리가 직접 닫은 경우든,
+  // 사용자가 로그인 도중 브라우저를 취소한 경우든)에 항상 발생하는 이벤트.
+  // 로그인이 성공했다면 위 user useEffect가 곧 홈으로 이동시키고, 실패/취소라면
+  // 이 리스너가 "로그인 중..." 버튼을 원래 상태로 되돌려 화면이 멈춰있지 않게 한다.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const listenerHandle = Browser.addListener('browserFinished', () => {
+      setIsLoading(false)
+    })
+
+    return () => {
+      listenerHandle.then((handle) => handle.remove())
+    }
+  }, [])
 
   // 이메일 인증 완료 상태 확인
   useEffect(() => {
@@ -96,8 +126,9 @@ export default function LoginPage() {
     setSuccess('')
     setIsLoading(true)
     const result = await signInWithProvider(provider)
-    // 성공 시에는 Supabase가 즉시 해당 플랫폼 로그인 화면으로 리다이렉트하므로
-    // 아래 코드는 provider 자체가 아직 연결되지 않았을 때(에러)만 실행된다.
+    // 웹: 성공 시 Supabase가 즉시 페이지 자체를 리다이렉트하므로 별도 처리가 필요 없다.
+    // 네이티브: 성공 시 시스템 브라우저가 뜬 상태라, 로그인 완료/취소 여부는 아래
+    // browserFinished 리스너와 위쪽의 user 상태 useEffect가 각각 처리한다.
     if (result.error) {
       setError(result.error)
       setIsLoading(false)

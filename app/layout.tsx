@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
@@ -6,10 +6,21 @@ import MobileShell from '@/components/layout/MobileShell'
 
 const inter = Inter({ subsets: ['latin'] })
 
+// viewport는 metadata와 별도 export로 분리해야 한다(Next 14 요구사항). 예전에는
+// metadata.viewport와 <head>의 수동 <meta name="viewport"> 태그가 동시에 존재해서
+// 두 개의 viewport 메타 태그가 충돌했고, 그 결과 maximum-scale/user-scalable이
+// 제대로 적용되지 않아 iOS에서 입력창 포커스 시 화면이 확대되는 문제가 있었다.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+}
+
 export const metadata: Metadata = {
   title: 'MindSnap',
   description: 'Capture your thoughts and ideas instantly',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover',
   icons: {
     icon: [
       { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
@@ -43,10 +54,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <head>
-        {/* iOS safe area meta tag */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-      </head>
+      <head></head>
       <body className={inter.className}>
         <AuthProvider>
           <MobileShell>
