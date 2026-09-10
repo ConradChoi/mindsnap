@@ -94,7 +94,12 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    // h-dvh + overflow-hidden: 이 컨테이너 자체는 화면 높이에 고정되고 스크롤되지 않는다.
+    // 배너/탭바는 이 안의 일반 flex 자식이라 항상 제자리에 있고, 아래 <main>만 내부적으로
+    // 스크롤된다 — position: fixed 없이도 탭바가 스크롤 중에 계속 화면에 보이게 하는 구조.
+    // (position: fixed는 iOS WKWebView에서 콘텐츠 높이/키보드 표시 등에 따라 위치가
+    // 흔들리는 오래된 문제가 있어 피한다.)
+    <div className="h-dvh bg-background flex flex-col pt-safe-top overflow-hidden">
       {/* 상단 배너 영역 */}
       <EventBanner
         title="🎉 새로운 기능이 추가되었습니다!"
@@ -102,13 +107,17 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
         onClose={handleBannerClose}
       />
 
-      {/* 메인 콘텐츠 */}
-      <main className="flex-1 container px-4 py-6 pb-safe-bottom">
+      {/* 메인 콘텐츠 — 이 영역만 스크롤된다 */}
+      <main className="flex-1 min-h-0 overflow-y-auto container px-4 py-6 pb-safe-bottom">
         {children}
       </main>
 
-      {/* 하단 탭 네비게이션 */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t pb-safe-bottom">
+      {/* 하단 탭 네비게이션
+          iOS WKWebView에서 position: fixed가 콘텐츠 높이/키보드 표시 등에 따라 위치가
+          흔들리는 문제가 있어(오래된 WebView 이슈), fixed 대신 flex 레이아웃의 자연스러운
+          배치(부모가 min-h-screen + flex-col, main이 flex-1이라 nav는 항상 화면 하단에 위치)를
+          사용한다. shrink-0로 main이 커져도 눌리지 않게 한다. */}
+      <nav className="shrink-0 bg-background border-t pb-safe-bottom">
         <div className="flex justify-around">
           {navItems.map(({ href, icon: Icon, label }) => {
             const isActive = pathname === href
