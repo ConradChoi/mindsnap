@@ -207,12 +207,15 @@ export const signOutUser = async () => {
     const { data } = await supabase.auth.getUser()
     const user = data.user
 
-    const { error } = await supabase.auth.signOut()
-    if (error) return { error: translateAuthError(error) }
-
+    // activity_log에 로그는 반드시 signOut 전에 남겨야 한다. RLS 정책(activity_log_insert_own)이
+    // "본인 인증된 사용자만 insert 가능"이라, signOut 이후에는 세션이 이미 사라져서
+    // 이 insert가 항상 RLS 위반으로 실패한다.
     if (user) {
       await logUserActivity(user.id, ACTIVITY_ACTIONS.LOGOUT, ACTIVITY_CATEGORIES.AUTH, { email: user.email })
     }
+
+    const { error } = await supabase.auth.signOut()
+    if (error) return { error: translateAuthError(error) }
 
     return { error: null }
   } catch (error: any) {
