@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Heart, Calendar, Smile, Meh, Frown, Angry, Laugh, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react'
+import { DatePicker } from '@/components/ui/date-picker'
+import { Heart, Smile, Meh, Frown, Angry, Laugh, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createRememberToday } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
@@ -501,41 +502,15 @@ export default function RememberTodayPage() {
           <label htmlFor="selectedDate" className="text-sm font-medium">
             년월일 선택 *
           </label>
-          <div className="relative">
-            {/* 실제 date input */}
-            <input
-              id="selectedDate"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSelectedDate(e.target.value)
-                  // 날짜 선택 시 알림 표시
-                  showDateSelectionNotification(e.target.value)
-                }
-              }}
-              className="w-full h-12 px-3 py-2 border border-input rounded-md bg-background text-base focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 pr-12"
-              required
-            />
-            {/* 달력 아이콘 */}
-            <button
-              type="button"
-              onClick={() => {
-                const dateInput = document.getElementById('selectedDate') as HTMLInputElement
-                if (dateInput) {
-                  // showPicker가 지원되는 경우 사용, 아니면 click 사용
-                  if (dateInput.showPicker) {
-                    dateInput.showPicker()
-                  } else {
-                    dateInput.click()
-                  }
-                }
-              }}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground hover:scale-110 transition-transform"
-            >
-              <Calendar className="w-5 h-5" />
-            </button>
-          </div>
+          <DatePicker
+            id="selectedDate"
+            value={selectedDate}
+            onChange={(date) => {
+              setSelectedDate(date)
+              // 날짜 선택 시 알림 표시
+              showDateSelectionNotification(date)
+            }}
+          />
         </div>
 
         {/* 액션 버튼들 */}
