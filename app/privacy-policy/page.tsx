@@ -10,28 +10,28 @@ import { ShieldCheck, ArrowLeft } from 'lucide-react'
 // Apple/Google 심사에서 "불완전한 개인정보처리방침"으로 반려될 수 있음).
 // ============================================================================
 const COMPANY = {
-  name: 'ylia Co., Ltd.',
+  name: '주식회사 일리아',
   serviceName: 'MindSnap',
-  representative: '[대표자명]',
-  businessNumber: '[사업자등록번호]',
-  address: '[사업장 주소]',
-  contactEmail: '[문의 이메일]',
-  privacyOfficerName: '[개인정보 보호책임자 성명]',
-  privacyOfficerPosition: '[직책]',
+  representative: '최종훈',
+  businessNumber: '832-86-03446',
+  address: '경기도 광명시 오리로 362 4층',
+  contactEmail: 'jhc@ylia.io',
+  privacyOfficerName: '최종훈',
+  privacyOfficerPosition: '대표',
 }
 
 // 방침 시행일 / 최종 개정일
-const EFFECTIVE_DATE = '[YYYY년 MM월 DD일]'
-const LAST_UPDATED = '[YYYY년 MM월 DD일]'
+const EFFECTIVE_DATE = '2026년 9월 10일'
+const LAST_UPDATED = '2026년 9월 10일'
 
 // 국외 이전 관련 — Supabase 프로젝트 리전, AWS Amplify 리전을 확인해서 채운다.
 // (Supabase 대시보드 > Project Settings > General > Region,
 //  AWS 콘솔 > Amplify > 앱 > 리전)
 const OVERSEAS = {
-  supabaseCountry: '[Supabase 프로젝트 리전 국가 - 예: 미국 / 싱가포르 / 일본]',
-  supabaseContact: '[Supabase 개인정보 문의처 - supabase.com/privacy 확인]',
-  awsCountry: '[AWS Amplify 리전 국가 - 예: 미국]',
-  awsContact: '[AWS 개인정보 문의처 - aws.amazon.com/privacy 확인]',
+  supabaseCountry: '미국 (운영사 Supabase, Inc. 소재국가 — 데이터베이스 서버 자체는 대한민국 서울 리전에 위치)',
+  supabaseContact: 'https://supabase.com/privacy',
+  awsCountry: '미국 (운영사 Amazon Web Services, Inc. 소재국가 — 호스팅 서버 자체는 대한민국 서울 리전에 위치)',
+  awsContact: 'https://aws.amazon.com/privacy',
 }
 
 // 활동 기록 보관기간 — 실제 자동 삭제 배치가 적용된 기간과 일치해야 한다.
