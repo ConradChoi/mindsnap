@@ -1,116 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { User, Settings, Info, LogOut, Trash2, ChevronRight, RotateCcw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { signOutUser } from '@/lib/auth'
-import { useAuth } from '@/contexts/AuthContext'
+import packageJson from '@/package.json'
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { user } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
-  const [deletedItemsCount, setDeletedItemsCount] = useState(0)
-
-  // 삭제된 항목 개수 계산
-  const calculateDeletedItemsCount = () => {
-    if (!user?.uid) return 0
-
-    try {
-      const twoWeeksAgo = new Date()
-      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
-      
-      let count = 0
-      
-      // 스냅 삭제된 항목 개수
-      const deletedSnapsData = localStorage.getItem(`deletedSnaps_${user.uid}`)
-      if (deletedSnapsData) {
-        try {
-          const data = JSON.parse(deletedSnapsData)
-          if (typeof data === 'object' && !Array.isArray(data)) {
-            Object.keys(data).forEach(itemId => {
-              const deletedAt = new Date(data[itemId].deletedAt)
-              if (deletedAt >= twoWeeksAgo) {
-                count++
-              }
-            })
-          } else if (Array.isArray(data)) {
-            count += data.length
-          }
-        } catch (e) {
-          console.error('Error parsing deleted snaps data:', e)
-        }
-      }
-      
-      // 마음 기록 삭제된 항목 개수
-      const deletedMoodData = localStorage.getItem(`deletedMoodRecords_${user.uid}`)
-      if (deletedMoodData) {
-        try {
-          const data = JSON.parse(deletedMoodData)
-          if (typeof data === 'object' && !Array.isArray(data)) {
-            Object.keys(data).forEach(itemId => {
-              const deletedAt = new Date(data[itemId].deletedAt)
-              if (deletedAt >= twoWeeksAgo) {
-                count++
-              }
-            })
-          } else if (Array.isArray(data)) {
-            count += data.length
-          }
-        } catch (e) {
-          console.error('Error parsing deleted mood data:', e)
-        }
-      }
-      
-      // 오늘을 기억할래 삭제된 항목 개수
-      const deletedRememberData = localStorage.getItem(`deletedRememberRecords_${user.uid}`)
-      if (deletedRememberData) {
-        try {
-          const data = JSON.parse(deletedRememberData)
-          if (typeof data === 'object' && !Array.isArray(data)) {
-            Object.keys(data).forEach(itemId => {
-              const deletedAt = new Date(data[itemId].deletedAt)
-              if (deletedAt >= twoWeeksAgo) {
-                count++
-              }
-            })
-          } else if (Array.isArray(data)) {
-            count += data.length
-          }
-        } catch (e) {
-          console.error('Error parsing deleted remember data:', e)
-        }
-      }
-      
-      return count
-    } catch (error) {
-      console.error('Error calculating deleted items count:', error)
-      return 0
-    }
-  }
-
-  // 컴포넌트 마운트 시 삭제된 항목 개수 계산
-  useEffect(() => {
-    if (user?.uid) {
-      const count = calculateDeletedItemsCount()
-      setDeletedItemsCount(count)
-    }
-  }, [user])
-
-  // 페이지 포커스 시 삭제된 항목 개수 새로고침
-  useEffect(() => {
-    const handleFocus = () => {
-      if (user?.uid) {
-        const count = calculateDeletedItemsCount()
-        setDeletedItemsCount(count)
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [user])
 
   const handleLogout = async () => {
     setIsLoading(true)
@@ -152,7 +52,7 @@ export default function SettingsPage() {
       }
     },
     {
-      title: `삭제된 기록 (${deletedItemsCount})`,
+      title: '삭제된 기록',
       description: '2주 이내 삭제한 항목들을 복구',
       icon: RotateCcw,
       onClick: () => {
@@ -216,14 +116,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div>
               <p className="font-medium">앱 버전</p>
-              <p className="text-sm text-muted-foreground">1.00</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-            <div>
-              <p className="font-medium">최신 업데이트</p>
-              <p className="text-sm text-muted-foreground">2024-01-26</p>
+              <p className="text-sm text-muted-foreground">{packageJson.version}</p>
             </div>
           </div>
         </CardContent>
