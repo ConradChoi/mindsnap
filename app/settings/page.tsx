@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { User, Settings, Info, LogOut, Trash2, ChevronRight, RotateCcw } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { signOutUser } from '@/lib/auth'
+import { signOutUser, deleteAccount } from '@/lib/auth'
 import packageJson from '@/package.json'
 
 export default function SettingsPage() {
@@ -25,10 +26,27 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteAccount = () => {
-    if (confirm('정말로 회원탈퇴를 하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
-      // TODO: 회원탈퇴 로직 구현
-      alert('회원탈퇴 기능은 준비 중입니다.')
+  const handleDeleteAccount = async () => {
+    // 계정과 모든 기록(스냅, 마음 기록, 오늘을 기억할래, 심리 검사 결과, 첨부 파일)이
+    // 영구 삭제되고 복구할 수 없다는 점을 확인 절차로 명확히 알린다(휴지통 복구 대상이 아님).
+    const confirmed = confirm(
+      '정말로 회원탈퇴를 하시겠습니까?\n계정과 모든 기록(사진, 음성, 마음 기록 등)이 영구적으로 삭제되며 복구할 수 없습니다.'
+    )
+    if (!confirmed) return
+
+    setIsLoading(true)
+    try {
+      const { error } = await deleteAccount()
+      if (error) {
+        alert(error)
+        return
+      }
+      router.push('/login')
+    } catch (error) {
+      console.error('회원탈퇴 오류:', error)
+      alert('회원탈퇴 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -119,6 +137,18 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">{packageJson.version}</p>
             </div>
           </div>
+          {/* 개인정보처리방침 — 앱 내에서 언제든 확인할 수 있어야 한다
+              (개인정보 보호법 제30조 공개 의무 / App Store·Google Play 심사 요건) */}
+          <Link
+            href="/privacy-policy"
+            className="flex items-center justify-between p-3 bg-muted rounded-lg hover:bg-muted/70 transition-colors"
+          >
+            <div>
+              <p className="font-medium">개인정보처리방침</p>
+              <p className="text-sm text-muted-foreground">수집 항목, 보유기간, 이용자 권리 안내</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
         </CardContent>
       </Card>
 
@@ -127,13 +157,15 @@ export default function SettingsPage() {
         <div className="flex justify-between">
           <button
             onClick={handleLogout}
-            className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+            disabled={isLoading}
+            className="text-muted-foreground hover:text-foreground transition-colors text-sm disabled:opacity-50"
           >
             로그아웃
           </button>
           <button
             onClick={handleDeleteAccount}
-            className="text-red-500 hover:text-red-600 transition-colors text-sm"
+            disabled={isLoading}
+            className="text-red-500 hover:text-red-600 transition-colors text-sm disabled:opacity-50"
           >
             회원탈퇴
           </button>

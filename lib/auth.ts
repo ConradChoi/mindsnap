@@ -294,6 +294,64 @@ export const updatePassword = async (currentPassword: string, newPassword: strin
   }
 }
 
+// 회원탈퇴(계정 및 모든 기록 영구 삭제) API 엔드포인트 URL을 플랫폼에 맞게 결정한다.
+// 네이티브 앱(Capacitor)은 정적 export라 자체적으로 이 API를 가질 수 없어(next.config.js,
+// scripts/build-capacitor.js 참고) 웹에 배포된 절대 URL을 호출해야 한다.
+// 웹은 항상 상대경로를 쓴다 — 현재 페이지가 떠 있는 도메인이 곧 API가 있는 도메인이라
+// NEXT_PUBLIC_APP_URL에 의존할 필요가 없고, 로컬 개발(next dev)에서도 그래야 로컬
+// 서버를 그대로 호출한다(프로덕션 도메인으로 잘못 나가는 것을 방지).
+const resolveAccountDeleteUrl = (): string => {
+  if (!Capacitor.isNativePlatform()) {
+    return '/api/account/delete'
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')
+  if (!appUrl) {
+    throw new Error('NEXT_PUBLIC_APP_URL이 설정되지 않아 네이티브 앱에서 회원탈퇴 API를 호출할 수 없습니다.')
+  }
+  return `${appUrl}/api/account/delete`
+}
+
+// 회원탈퇴(계정 및 모든 기록 영구 삭제).
+// RLS는 하드 삭제를 허용하지 않으므로(0001_core_schema.sql 등 — DELETE 정책 없음),
+// 실제 삭제는 service_role 권한을 가진 서버 라우트(app/api/account/delete)가 수행한다.
+// 여기서는 현재 세션의 access token을 그 라우트에 넘기고, 성공하면 로컬 세션을 정리한다.
+export const deleteAccount = async (): Promise<{ error: string | null }> => {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token
+    if (!accessToken) {
+      return { error: '로그인 정보를 확인할 수 없습니다. 다시 로그인 후 시도해주세요.' }
+    }
+
+    const url = resolveAccountDeleteUrl()
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+
+    let body: { error?: string; success?: boolean } | null = null
+    try {
+      body = await response.json()
+    } catch {
+      body = null
+    }
+
+    if (!response.ok || !body?.success) {
+      return { error: body?.error ?? '회원탈퇴 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' }
+    }
+
+    // 서버에서 계정이 이미 삭제되었으므로 signOut의 activity_log 기록(RLS로 어차피 실패)은
+    // 건너뛰고, 로컬 세션만 정리한다.
+    await supabase.auth.signOut()
+
+    return { error: null }
+  } catch (error: any) {
+    console.error('회원탈퇴 처리 오류:', error)
+    return { error: translateAuthError(error) }
+  }
+}
+
 // 프로필(닉네임) 업데이트
 export const updateProfile = async (profileData: { displayName?: string; photoURL?: string }) => {
   try {

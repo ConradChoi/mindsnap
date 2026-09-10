@@ -16,6 +16,16 @@ interface MobileShellProps {
   children: React.ReactNode
 }
 
+// 로그인 없이 접근할 수 있는 경로.
+// 개인정보처리방침은 App Store/Google Play 심사와 법령(개인정보 보호법 제30조: 정보주체가 언제든지
+// 쉽게 확인할 수 있도록 공개)상 비로그인 상태에서도 반드시 열람 가능해야 하므로 예외로 둔다.
+const PUBLIC_PATHS = ['/login', '/privacy-policy']
+
+// Capacitor 정적 빌드(output: 'export')에서는 경로 끝에 슬래시가 붙는 경우가 있어 비교 전에 정규화한다.
+const normalizePath = (path: string) => (path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path)
+
+const isPublicPath = (path: string) => PUBLIC_PATHS.includes(normalizePath(path))
+
 const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
   const pathname = usePathname()
   const { user, loading } = useAuth()
@@ -61,9 +71,9 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
     { href: '/settings', icon: Settings, label: '설정' },
   ]
 
-  // 인증되지 않은 사용자를 로그인 페이지로 리다이렉트
+  // 인증되지 않은 사용자를 로그인 페이지로 리다이렉트 (공개 경로는 제외)
   useEffect(() => {
-    if (!loading && !user && pathname !== '/login') {
+    if (!loading && !user && !isPublicPath(pathname)) {
       router.push('/login')
     }
   }, [loading, user, pathname, router])
@@ -102,8 +112,19 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
   }
 
   // 로그인 페이지인 경우 네비게이션 없이 렌더링
-  if (pathname === '/login') {
+  if (normalizePath(pathname) === '/login') {
     return <>{children}</>
+  }
+
+  // 비로그인 상태에서 공개 경로(개인정보처리방침 등)에 접근한 경우:
+  // 하단 탭 네비게이션 없이 콘텐츠만 스크롤 가능한 형태로 보여준다.
+  // (스토어 심사자/미가입자도 로그인 없이 방침 전문을 볼 수 있어야 한다.)
+  if (!user && isPublicPath(pathname)) {
+    return (
+      <div className="min-h-screen bg-background pt-safe-top pb-safe-bottom">
+        <div className="container px-4 py-6">{children}</div>
+      </div>
+    )
   }
 
   // 인증되지 않은 사용자는 아무것도 렌더링하지 않음 (useEffect에서 리다이렉트 처리)

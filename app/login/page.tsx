@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signInWithEmail, signUpWithEmail, signInWithProvider, type SocialProvider } from '@/lib/auth'
 import EmailFindModal from '@/components/EmailFindModal'
@@ -29,6 +30,9 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [autoLogin, setAutoLogin] = useState(false)
+  // 회원가입 시 개인정보 수집·이용 동의 및 만 14세 이상 확인 (개인정보 보호법 제15조·제22조의2).
+  // 동의 없이 가입을 진행하면 개인정보를 적법한 근거 없이 수집하게 되므로 필수 체크로 둔다.
+  const [agreedToPolicy, setAgreedToPolicy] = useState(false)
   const [isEmailFindModalOpen, setIsEmailFindModalOpen] = useState(false)
   const [isPasswordResetModalOpen, setIsPasswordResetModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'email-find' | 'password-reset'>('email-find')
@@ -73,6 +77,10 @@ export default function LoginPage() {
     e.preventDefault()
     if (!email || !password) {
       setError('이메일과 비밀번호를 입력해주세요.')
+      return
+    }
+    if (isSignUp && !agreedToPolicy) {
+      setError('만 14세 이상 여부 확인 및 개인정보처리방침 동의가 필요합니다.')
       return
     }
 
@@ -143,6 +151,7 @@ export default function LoginPage() {
     setEmail('')
     setPassword('')
     setShowPassword(false)
+    setAgreedToPolicy(false)
   }
 
   return (
@@ -268,6 +277,28 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {/* 회원가입 필수 동의 — 만 14세 미만 아동은 가입할 수 없으며(개인정보 보호법 제22조의2),
+                  개인정보 수집·이용에 대한 동의를 받은 뒤에만 계정을 생성한다. */}
+              {isSignUp && (
+                <div className="flex items-start space-x-2 rounded-md bg-muted/50 p-3">
+                  <Checkbox
+                    id="agreeToPolicy"
+                    checked={agreedToPolicy}
+                    onCheckedChange={(checked) => setAgreedToPolicy(checked as boolean)}
+                    className="mt-0.5"
+                  />
+                  {/* 링크를 label 안에 넣으면 링크 클릭 시 체크박스까지 토글되므로 형제 요소로 분리한다 */}
+                  <div className="text-sm text-muted-foreground leading-relaxed">
+                    <label htmlFor="agreeToPolicy" className="cursor-pointer">
+                      [필수] 만 14세 이상이며, 개인정보 수집·이용에 동의합니다.
+                    </label>{' '}
+                    <Link href="/privacy-policy" className="text-primary underline underline-offset-2">
+                      개인정보처리방침 보기
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               {/* 제출 버튼 */}
               <Button
                 type="submit"
@@ -338,6 +369,17 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* 비로그인 상태에서도 개인정보처리방침에 접근할 수 있어야 한다
+            (개인정보 보호법 제30조 공개 의무 / App Store·Google Play 심사 요건).
+            SNS 계정으로 가입하는 경우에도 이 안내를 통해 처리방침을 확인할 수 있게 한다. */}
+        <p className="text-center text-xs text-muted-foreground leading-relaxed">
+          SNS 계정으로 계속하기를 선택하는 경우, 만 14세 이상이며{' '}
+          <Link href="/privacy-policy" className="text-primary underline underline-offset-2">
+            개인정보처리방침
+          </Link>
+          에 동의하는 것으로 봅니다.
+        </p>
       </div>
 
       {/* 이메일 찾기/비밀번호 찾기 모달 */}

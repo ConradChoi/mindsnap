@@ -1,8 +1,11 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // 브라우저에서 직접 호출되는 클라이언트 (RLS로 보호됨, anon key만 사용)
-// 서버 라우트/서비스 롤 키는 이 프로젝트에서 사용하지 않는다 (2단계 Capacitor 정적 빌드 전환 대비,
-// app/api/* 서버 라우트를 두지 않고 화면에서 Supabase JS SDK를 직접 호출하는 구조를 유지한다).
+// 서비스 롤 키는 이 파일에서 사용하지 않는다 (Capacitor 정적 빌드 전환 대비, 화면에서는
+// Supabase JS SDK를 anon key로 직접 호출하는 구조를 유지한다). 예외적으로 RLS로 막혀 있는
+// 작업(회원탈퇴 등 하드 삭제)만 app/api/*의 서버 전용 라우트 + lib/supabase-admin.ts의
+// service_role 클라이언트를 쓴다 — 해당 라우트는 빌드 시점에 Capacitor 빌드에서 제외된다
+// (scripts/build-capacitor.js 참고).
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
