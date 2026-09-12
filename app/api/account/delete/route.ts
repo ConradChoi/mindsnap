@@ -70,8 +70,18 @@ export async function POST(request: NextRequest) {
     admin = getSupabaseAdminClient()
   } catch (error: any) {
     console.error('[account-delete] service_role 미설정:', error.message)
+    // TEMP DEBUG (원인 파악 후 즉시 제거 예정) — 비밀값은 노출하지 않고 존재 여부/길이만 확인
     return NextResponse.json(
-      { error: '현재 회원탈퇴를 처리할 수 없습니다. 잠시 후 다시 시도하거나 고객센터로 문의해주세요.' },
+      {
+        error: '현재 회원탈퇴를 처리할 수 없습니다. 잠시 후 다시 시도하거나 고객센터로 문의해주세요.',
+        __debug: {
+          hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+          serviceRoleKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length ?? 0,
+          envKeysWithSupabase: Object.keys(process.env).filter(k => k.toUpperCase().includes('SUPABASE')),
+          nodeEnv: process.env.NODE_ENV,
+        },
+      },
       { status: 503, headers: corsHeaders }
     )
   }
