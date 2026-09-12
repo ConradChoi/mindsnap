@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:verbose": "next build --debug",
-    "build:capacitor": "node scripts/build-capacitor.js",
+    "build:capacitor": "BUILD_TARGET=capacitor next build",
     "start": "next start",
     "lint": "next lint"
   },
