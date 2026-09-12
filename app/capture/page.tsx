@@ -445,16 +445,6 @@ export default function CapturePage() {
                          </div>
                        </div>
                        
-                       {/* 음성-텍스트 변환 상태 표시 */}
-                       {isTranscribing && (
-                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                           <div className="flex items-center space-x-2 text-blue-700">
-                             <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                             <span className="text-sm font-medium">{transcriptionProgress}</span>
-                           </div>
-                         </div>
-                       )}
-                       
                        {/* 변환된 텍스트 표시 */}
                        {transcriptionText && !isTranscribing && (
                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
