@@ -1,5 +1,14 @@
 apply plugin: 'com.android.application'
 
+// 릴리스 서명 정보 — keystore.properties/mindsnap-release.keystore는 gitignore 처리되어
+// 저장소에 커밋되지 않는다. 로컬에 없으면(예: 다른 컴퓨터에서 클론) 릴리스 서명 없이도
+// 빌드는 되지만 release 빌드타입에 signingConfig가 비워진다.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "io.ylia.mindsnap"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +25,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
 }
