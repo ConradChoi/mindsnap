@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Camera, BookOpen, Settings, Home, PenTool, LogOut } from 'lucide-react'
@@ -42,6 +42,50 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
     setBannerHidden(localStorage.getItem('mindsnap_banner_hidden') === 'true')
     setBannerCollapsed(localStorage.getItem('mindsnap_banner_closed') === 'true')
     setBannerLoaded(true)
+  }, [])
+
+  // 하단 탭바를 "스크롤 중" 또는 "키보드가 열려있음" 둘 중 하나라도 해당하면 숨긴다.
+  // 두 조건을 별도 상태로 추적해서 하나가 먼저 끝나도 다른 조건이 남아있으면 계속 숨겨진다.
+  const mainRef = useRef<HTMLElement>(null)
+  const [isScrolling, setIsScrolling] = useState(false)
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
+  const navVisible = !isScrolling && !isKeyboardOpen
+
+  useEffect(() => {
+    const mainEl = mainRef.current
+    if (!mainEl) return
+
+    // 스크롤 중엔 숨기고, 스크롤이 멈춘 뒤(200ms 동안 추가 스크롤 없음) 다시 보여준다.
+    let scrollTimeout: ReturnType<typeof setTimeout>
+    const handleScroll = () => {
+      setIsScrolling(true)
+      clearTimeout(scrollTimeout)
+      scrollTimeout = setTimeout(() => setIsScrolling(false), 200)
+    }
+
+    // 텍스트 입력에 포커스가 가는 순간(키보드가 뜨기 시작하기 전) 바로 숨긴다 —
+    // 키보드 표시/숨김 애니메이션과 fixed 요소의 위치 재계산이 겹치는 상황 자체를
+    // 만들지 않기 위함(iOS WKWebView에서 둘이 겹치면 위치가 흔들리던 과거 이슈 회피).
+    const isTextInput = (el: EventTarget | null) =>
+      el instanceof HTMLElement &&
+      (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+    const handleFocusIn = (e: FocusEvent) => {
+      if (isTextInput(e.target)) setIsKeyboardOpen(true)
+    }
+    const handleFocusOut = (e: FocusEvent) => {
+      if (isTextInput(e.target)) setIsKeyboardOpen(false)
+    }
+
+    mainEl.addEventListener('scroll', handleScroll, { passive: true })
+    document.addEventListener('focusin', handleFocusIn)
+    document.addEventListener('focusout', handleFocusOut)
+
+    return () => {
+      clearTimeout(scrollTimeout)
+      mainEl.removeEventListener('scroll', handleScroll)
+      document.removeEventListener('focusin', handleFocusIn)
+      document.removeEventListener('focusout', handleFocusOut)
+    }
   }, [])
 
   // 배너 "닫기" — 풀배너를 접어서 작은 "공지사항 보기" 링크로 바꾼다
@@ -151,17 +195,26 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
         />
       )}
 
-      {/* 메인 콘텐츠 — 이 영역만 스크롤된다 */}
-      <main className="flex-1 min-h-0 overflow-y-auto container px-4 py-6 pb-safe-bottom">
+      {/* 메인 콘텐츠 — 이 영역만 스크롤된다.
+          하단 탭바가 fixed 오버레이라 그 높이(약 4.5rem)만큼 pb를 더 줘서
+          탭바가 보일 때 마지막 콘텐츠를 가리지 않게 한다. */}
+      <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto container px-4 py-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))]">
         {children}
       </main>
 
-      {/* 하단 탭 네비게이션
-          iOS WKWebView에서 position: fixed가 콘텐츠 높이/키보드 표시 등에 따라 위치가
-          흔들리는 문제가 있어(오래된 WebView 이슈), fixed 대신 flex 레이아웃의 자연스러운
-          배치(부모가 min-h-screen + flex-col, main이 flex-1이라 nav는 항상 화면 하단에 위치)를
-          사용한다. shrink-0로 main이 커져도 눌리지 않게 한다. */}
-      <nav className="shrink-0 bg-background border-t pb-safe-bottom">
+      {/* 하단 탭 네비게이션 — 화면 가장자리에서 띄운 플로팅 바.
+          스크롤 중이거나 텍스트 입력 포커스(키보드 열림) 중엔 translateY로 감춘다.
+          과거 iOS WKWebView에서 position: fixed가 "키보드 표시/숨김 애니메이션"과
+          겹칠 때 위치가 흔들리던 문제가 있었는데, 포커스 시점에 키보드 애니메이션보다
+          먼저 숨겨버려서 그 두 조건이 동시에 일어나는 상황 자체를 만들지 않는다. */}
+      <nav
+        className={cn(
+          'fixed left-4 right-4 bottom-nav-floating z-40',
+          'bg-background border rounded-2xl shadow-lg',
+          'transition-transform duration-200 ease-out',
+          navVisible ? 'translate-y-0' : 'translate-y-[calc(100%+1rem)]'
+        )}
+      >
         <div className="flex justify-around">
           {navItems.map(({ href, icon: Icon, label }) => {
             const isActive = pathname === href
@@ -170,7 +223,7 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
                 key={href}
                 href={href}
                 className={cn(
-                  "flex flex-col items-center justify-center min-h-touch py-2 px-3 flex-1 transition-colors",
+                  "flex flex-col items-center justify-center min-h-touch py-2 px-3 flex-1 transition-colors rounded-2xl",
                   isActive
                     ? "text-primary bg-primary/5"
                     : "text-muted-foreground hover:text-foreground"
