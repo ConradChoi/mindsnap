@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Bell, Calendar } from 'lucide-react'
+import { ArrowLeft, Bell, Calendar, Sparkles } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { getSentimentAnalysisPreference, updateSentimentAnalysisPreference } from '@/lib/supabase-service'
 
 export default function AppSettingsPage() {
   const router = useRouter()
@@ -15,12 +16,22 @@ export default function AppSettingsPage() {
   // 알림 설정 상태
   const [rememberTodayNotification, setRememberTodayNotification] = useState(true)
 
+  // AI 감정 분석 옵트아웃 토글 — 기본값은 true(켜짐), DB(profiles.sentiment_analysis_enabled)에서 불러온다
+  const [sentimentEnabled, setSentimentEnabled] = useState(true)
+  const [sentimentLoading, setSentimentLoading] = useState(false)
+
   useEffect(() => {
     if (user) {
       // 사용자의 알림 설정을 불러오기 (로컬 스토리지에서)
       const savedNotificationSetting = localStorage.getItem('rememberTodayNotification')
       if (savedNotificationSetting !== null) {
         setRememberTodayNotification(JSON.parse(savedNotificationSetting))
+      }
+
+      if (user.uid) {
+        getSentimentAnalysisPreference(user.uid)
+          .then(setSentimentEnabled)
+          .catch((error) => console.error('감정 분석 설정 조회 오류:', error))
       }
     }
   }, [user])
@@ -42,6 +53,22 @@ export default function AppSettingsPage() {
       alert('알림 설정 변경 중 오류가 발생했습니다.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleSentimentToggle = async () => {
+    if (!user?.uid) return
+    setSentimentLoading(true)
+
+    try {
+      const newValue = !sentimentEnabled
+      await updateSentimentAnalysisPreference(user.uid, newValue)
+      setSentimentEnabled(newValue)
+    } catch (error) {
+      console.error('감정 분석 설정 변경 오류:', error)
+      alert('설정 변경 중 오류가 발생했습니다.')
+    } finally {
+      setSentimentLoading(false)
     }
   }
 
@@ -99,6 +126,45 @@ export default function AppSettingsPage() {
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                   rememberTodayNotification ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI 감정 분석 설정 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <span>AI 감정 분석</span>
+          </CardTitle>
+          <CardDescription>
+            기록한 글을 바탕으로 감정과 키워드를 분석해서 보여드려요
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium">감정 분석 사용</p>
+                <p className="text-xs text-muted-foreground">
+                  끄면 이후 작성하는 기록은 분석되지 않아요
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleSentimentToggle}
+              disabled={sentimentLoading}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                sentimentEnabled ? 'bg-primary' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  sentimentEnabled ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>
