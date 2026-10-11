@@ -204,6 +204,12 @@ export const getSnap = async (snapId: string): Promise<Snap | null> => {
   return mapSnapRow(data, urls)
 }
 
+export const getMoodRecord = async (recordId: string): Promise<MoodRecord | null> => {
+  const { data, error } = await supabase.from('mood_records').select('*').eq('id', recordId).maybeSingle<MoodRecordRow>()
+  if (error || !data) return null
+  return mapMoodRecordRow(data)
+}
+
 export const updateSnap = async (snapId: string, snapData: Partial<Pick<Snap, 'title' | 'note' | 'tags'>>) => {
   const { error } = await supabase
     .from('snaps')
@@ -379,6 +385,12 @@ export const getRememberToday = async (userId: string, limitCount = 30): Promise
   }
 }
 
+export const getRememberTodayItem = async (id: string): Promise<RememberToday | null> => {
+  const { data, error } = await supabase.from('remember_today').select('*').eq('id', id).maybeSingle<RememberTodayRow>()
+  if (error || !data) return null
+  return mapRememberTodayRow(data)
+}
+
 export const updateRememberToday = async (rememberTodayId: string, rememberData: Partial<RememberToday>) => {
   const { error } = await supabase
     .from('remember_today')
@@ -496,6 +508,12 @@ export const getPersonalityTestResults = async (
     console.error('Error fetching personality test results:', error)
     return []
   }
+}
+
+export const getPersonalityTestResultById = async (id: string): Promise<PersonalityTestResult | null> => {
+  const { data, error } = await supabase.from('personality_test_results').select('*').eq('id', id).maybeSingle<PersonalityTestResultRow>()
+  if (error || !data) return null
+  return mapPersonalityTestResultRow(data)
 }
 
 // =========================================================
