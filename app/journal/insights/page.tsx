@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/contexts/AuthContext'
-import { getSentimentAnalysisForUser } from '@/lib/supabase-service'
+import { getMoodRecords, getRememberToday, getSentimentAnalysisForUser, getSnaps } from '@/lib/supabase-service'
 import { SentimentAnalysis } from '@/lib/types'
 import SentimentTrendChart from '@/components/SentimentTrendChart'
 
@@ -14,17 +14,36 @@ export default function JournalInsightsPage() {
   const router = useRouter()
   const { user } = useAuth()
   const [analyses, setAnalyses] = useState<SentimentAnalysis[]>([])
+  // 삭제(소프트 삭제)된 기록의 분석 결과까지 추이/키워드에 남는 걸 막기 위해,
+  // 현재 존재하는(삭제되지 않은) 기록 id만 모아둔다(2026-10-11 최종 리뷰 Important).
+  const [validSourceIds, setValidSourceIds] = useState<Set<string> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     if (!user?.uid) return
-    getSentimentAnalysisForUser(user.uid, 500)
-      .then(setAnalyses)
+    Promise.all([
+      getSentimentAnalysisForUser(user.uid, 500),
+      getSnaps(user.uid, 1000),
+      getMoodRecords(user.uid, 1000),
+      getRememberToday(user.uid, 1000),
+    ])
+      .then(([analysisRows, snaps, moodRecords, rememberRecords]) => {
+        setAnalyses(analysisRows)
+        setValidSourceIds(
+          new Set([
+            ...snaps.map((s) => s.id),
+            ...moodRecords.map((m) => m.id),
+            ...rememberRecords.map((r) => r.id),
+          ])
+        )
+      })
       .catch((error) => console.error('감정 인사이트 조회 오류:', error))
       .finally(() => setIsLoading(false))
   }, [user?.uid])
 
-  const completed = analyses.filter((a) => a.status === 'completed')
+  const completed = analyses.filter(
+    (a) => a.status === 'completed' && (validSourceIds?.has(a.sourceId) ?? false)
+  )
 
   const trendPoints = [...completed]
     .filter((a) => a.sentimentScore !== undefined)
