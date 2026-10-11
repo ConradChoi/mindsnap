@@ -19,7 +19,9 @@ import {
 } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logTabSwitch } from '@/lib/analytics'
-import { PersonalityTestResult } from '@/lib/types'
+import { PersonalityTestResult, SentimentAnalysis } from '@/lib/types'
+import { useSentimentMap, sentimentKey } from '@/lib/hooks/useSentimentMap'
+import { SentimentBadge } from '@/components/SentimentBadge'
 
 // 날짜 포맷팅 함수
 const formatDate = (date: Date | any) => {
@@ -124,18 +126,20 @@ const SwipeToDeleteCard = ({
 }
 
 // 마음 기록 목록 컴포넌트
-const MoodRecordList = ({ 
-  searchTerm, 
-  displayedRecords, 
-  hasMore, 
+const MoodRecordList = ({
+  searchTerm,
+  displayedRecords,
+  hasMore,
   isLoadingMore,
-  onDelete
-}: { 
+  onDelete,
+  sentimentMap
+}: {
   searchTerm: string
   displayedRecords: any[]
   hasMore: boolean
   isLoadingMore: boolean
   onDelete: (recordId: string) => void
+  sentimentMap: Record<string, SentimentAnalysis>
 }) => {
   console.log('MoodRecordList props:', { displayedRecords }) // 디버깅용
 
@@ -211,7 +215,8 @@ const MoodRecordList = ({
                   <h3 className="font-medium text-foreground text-base">
                     {record.note || '마음 기록'}
                   </h3>
-                  
+                  <SentimentBadge analysis={sentimentMap[sentimentKey('mood_record', record.id)]} />
+
                   {/* 등록일시 */}
                   <div className="text-sm text-muted-foreground">
                     {formatDate(record.createdAt)}
@@ -242,18 +247,20 @@ const MoodRecordList = ({
 }
 
 // 오늘을 기억할래 목록 컴포넌트
-const RememberTodayList = ({ 
-  searchTerm, 
-  displayedRecords, 
-  hasMore, 
+const RememberTodayList = ({
+  searchTerm,
+  displayedRecords,
+  hasMore,
   isLoadingMore,
-  onDelete
-}: { 
+  onDelete,
+  sentimentMap
+}: {
   searchTerm: string
   displayedRecords: any[]
   hasMore: boolean
   isLoadingMore: boolean
   onDelete: (recordId: string) => void
+  sentimentMap: Record<string, SentimentAnalysis>
 }) => {
   console.log('RememberTodayList props:', { displayedRecords }) // 디버깅용
 
@@ -308,7 +315,8 @@ const RememberTodayList = ({
                   <h3 className="font-medium text-foreground text-base">
                     {record.summary}
                   </h3>
-                
+                  <SentimentBadge analysis={sentimentMap[sentimentKey('remember_today', record.id)]} />
+
                 {/* 등록일시 */}
                   <div className="text-sm text-muted-foreground">
                     {formatDate(record.createdAt)}
@@ -339,20 +347,22 @@ const RememberTodayList = ({
 }
 
 // 스냅 목록 컴포넌트
-const SnapList = ({ 
-  filteredSnaps, 
+const SnapList = ({
+  filteredSnaps,
   searchTerm,
   displayedSnaps,
   hasMore,
   isLoadingMore,
-  onDelete
-}: { 
+  onDelete,
+  sentimentMap
+}: {
   filteredSnaps: ListSnapsRes['snaps']
   searchTerm: string
   displayedSnaps: ListSnapsRes['snaps']
   hasMore: boolean
   isLoadingMore: boolean
   onDelete: (snapId: string) => void
+  sentimentMap: Record<string, SentimentAnalysis>
 }) => {
   if (filteredSnaps.length === 0) {
     return (
@@ -396,7 +406,8 @@ const SnapList = ({
                   <h3 className="font-medium text-foreground text-base">
                   {snap.title}
                 </h3>
-                
+                <SentimentBadge analysis={sentimentMap[sentimentKey('snap', snap.id)]} />
+
                   {/* 음성파일여부 */}
                   <div className="flex items-center space-x-2">
                     <Mic className="w-4 h-4 text-blue-500" />
@@ -521,6 +532,7 @@ const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
 
 export default function JournalPage() {
   const { user } = useAuth()
+  const sentimentMap = useSentimentMap(user?.uid)
   const [snaps, setSnaps] = useState<ListSnapsRes['snaps']>([])
   const [filteredSnaps, setFilteredSnaps] = useState<ListSnapsRes['snaps']>([])
   const [moodRecords, setMoodRecords] = useState<any[]>([])
@@ -868,37 +880,40 @@ export default function JournalPage() {
               {activeTab === 'mood' && (
                 <>
                   {console.log('Rendering mood tab with:', { displayedMoodRecords, moodRecords })}
-                <MoodRecordList 
+                <MoodRecordList
                   searchTerm={searchTerm}
                   displayedRecords={displayedMoodRecords}
                   hasMore={hasMoreMoodRecords}
                   isLoadingMore={isLoadingMore}
                     onDelete={handleDeleteMoodRecord}
+                    sentimentMap={sentimentMap}
                   />
                 </>
               )}
               {activeTab === 'remember' && (
                 <>
                   {console.log('Rendering remember tab with:', { displayedRememberRecords, rememberTodayRecords })}
-                  <RememberTodayList 
+                  <RememberTodayList
                     searchTerm={searchTerm}
                     displayedRecords={displayedRememberRecords}
                     hasMore={hasMoreRememberRecords}
                     isLoadingMore={isLoadingMore}
                     onDelete={handleDeleteRememberRecord}
+                    sentimentMap={sentimentMap}
                   />
                 </>
               )}
               {activeTab === 'snaps' && (
                 <>
                   {console.log('Rendering snaps tab with:', { displayedSnaps, filteredSnaps, snaps })}
-                <SnapList 
-                  filteredSnaps={filteredSnaps} 
+                <SnapList
+                  filteredSnaps={filteredSnaps}
                   searchTerm={searchTerm}
                   displayedSnaps={displayedSnaps}
                   hasMore={hasMoreSnaps}
                   isLoadingMore={isLoadingMore}
                     onDelete={handleDeleteSnap}
+                    sentimentMap={sentimentMap}
                 />
                 </>
               )}
