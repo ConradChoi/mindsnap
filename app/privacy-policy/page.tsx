@@ -32,6 +32,8 @@ const OVERSEAS = {
   supabaseContact: 'https://supabase.com/privacy',
   awsCountry: '미국 (운영사 Amazon Web Services, Inc. 소재국가 — 호스팅 서버 자체는 대한민국 서울 리전에 위치)',
   awsContact: 'https://aws.amazon.com/privacy',
+  googleCloudCountry: '미국 (운영사 Google LLC 소재국가)',
+  googleCloudContact: 'https://cloud.google.com/terms/cloud-privacy-notice',
 }
 
 // 활동 기록 보관기간 — 실제 자동 삭제 배치가 적용된 기간과 일치해야 한다.
@@ -271,6 +273,13 @@ export default function PrivacyPolicyPage() {
               ['보유기간', '위탁계약 종료 시 또는 제3조의 보유기간 종료 시까지'],
             ]}
           />
+          <ItemBlock
+            title="Google LLC (Google Cloud Natural Language API)"
+            rows={[
+              ['위탁 업무', '이용자가 작성한 기록의 감정 분석 및 주요 키워드(엔티티) 추출'],
+              ['보유기간', '분석 요청·응답 처리 목적으로만 일시 사용되며 별도로 보관되지 않음'],
+            ]}
+          />
           <p className="text-sm leading-relaxed text-muted-foreground">
             Google 및 Apple은 이용자가 소셜 로그인을 선택한 경우에 한하여 인증 절차를 수행하는 사업자로서, 회사가
             이용자의 개인정보를 제공하는 대상이 아니라 회사가 인증 결과와 계정 정보를 전달받는 대상입니다. 각 사업자의
@@ -311,6 +320,21 @@ export default function PrivacyPolicyPage() {
               ['연락처', OVERSEAS.awsContact],
             ]}
           />
+          <ItemBlock
+            title="Google LLC (Google Cloud Natural Language API)"
+            rows={[
+              ['이전 국가', OVERSEAS.googleCloudCountry],
+              ['이전 항목', '스냅 메모, 마음 기록 메모, 오늘을 기억할래 전체 텍스트'],
+              ['이전 일시·방법', '기록 저장 시점에 정보통신망을 통해 암호화된 상태로 전송'],
+              ['이용 목적', '감정 분석 및 주요 키워드(엔티티) 추출'],
+              ['보유기간', '분석 요청·응답 처리 목적으로만 일시 사용되며 별도로 보관되지 않음'],
+              ['연락처', OVERSEAS.googleCloudContact],
+            ]}
+          />
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            감정 분석 기능은 설정 &gt; 앱 설정 &gt; AI 감정 분석에서 언제든지 끌 수 있으며, 끄더라도
+            서비스의 다른 모든 기능은 정상적으로 이용할 수 있습니다.
+          </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
             이용자는 개인정보의 국외 이전을 거부할 수 있습니다. 거부를 원하시는 경우 제14조의 연락처로 요청하시거나
             회원 탈퇴를 진행하시면 됩니다. 다만 서비스의 인증·저장 기능 전체가 위 사업자의 인프라에서 제공되므로, 국외
