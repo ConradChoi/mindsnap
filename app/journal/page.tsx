@@ -865,6 +865,14 @@ export default function JournalPage() {
         })}
       </div>
 
+      <div className="flex justify-end">
+        <Link href="/journal/insights">
+          <Button variant="outline" size="sm">
+            감정 인사이트 보기
+          </Button>
+        </Link>
+      </div>
+
       {/* 검색 */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
