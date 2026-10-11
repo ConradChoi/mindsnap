@@ -85,6 +85,12 @@ export interface PersonalityTestResultRow {
 // 이미지/음성 signed URL은 매퍼 밖(lib/storage.ts)에서 채워 넣는다 (I/O가 필요하므로).
 
 import { MoodRecord, PersonalityTestResult, PersonalityTestType, RememberToday, Snap, User } from './types'
+import {
+  SentimentAnalysis,
+  SentimentEntity,
+  SentimentSourceTable,
+  SentimentStatus,
+} from './types'
 
 export const mapProfileRow = (row: ProfileRow, email: string | null): User => ({
   uid: row.id,
@@ -143,4 +149,30 @@ export const mapRememberTodayRow = (row: RememberTodayRow): RememberToday => ({
   createdAt: toDateRequired(row.created_at),
   updatedAt: toDateRequired(row.updated_at),
   deletedAt: toDate(row.deleted_at),
+})
+
+export interface SentimentAnalysisRow {
+  id: string
+  user_id: string
+  source_table: SentimentSourceTable
+  source_id: string
+  status: SentimentStatus
+  sentiment_score: number | null
+  sentiment_magnitude: number | null
+  entities: SentimentEntity[] | null
+  created_at: string
+  updated_at: string
+}
+
+export const mapSentimentAnalysisRow = (row: SentimentAnalysisRow): SentimentAnalysis => ({
+  id: row.id,
+  userId: row.user_id,
+  sourceTable: row.source_table,
+  sourceId: row.source_id,
+  status: row.status,
+  sentimentScore: row.sentiment_score ?? undefined,
+  sentimentMagnitude: row.sentiment_magnitude ?? undefined,
+  entities: row.entities ?? [],
+  createdAt: toDateRequired(row.created_at),
+  updatedAt: toDateRequired(row.updated_at),
 })

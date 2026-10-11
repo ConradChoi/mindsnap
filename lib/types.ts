@@ -80,3 +80,28 @@ export interface TrashItem {
   title: string
   data: Snap | MoodRecord | RememberToday
 }
+
+// =========================================================
+// 감정 분석 (Google Cloud Natural Language API)
+// =========================================================
+export type SentimentSourceTable = 'snap' | 'mood_record' | 'remember_today'
+export type SentimentStatus = 'pending' | 'completed' | 'failed'
+
+export interface SentimentEntity {
+  name: string
+  type: string
+  salience: number
+}
+
+export interface SentimentAnalysis {
+  id: string
+  userId: string
+  sourceTable: SentimentSourceTable
+  sourceId: string
+  status: SentimentStatus
+  sentimentScore?: number
+  sentimentMagnitude?: number
+  entities: SentimentEntity[]
+  createdAt: Date
+  updatedAt: Date
+}

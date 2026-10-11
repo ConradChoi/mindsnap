@@ -12,11 +12,13 @@ import {
   mapPersonalityTestResultRow,
   mapProfileRow,
   mapRememberTodayRow,
+  mapSentimentAnalysisRow,
   mapSnapRow,
   MoodRecordRow,
   PersonalityTestResultRow,
   ProfileRow,
   RememberTodayRow,
+  SentimentAnalysisRow,
   SnapRow,
   toDateRequired,
 } from './mappers'
@@ -26,6 +28,7 @@ import {
   PersonalityTestResult,
   PersonalityTestType,
   RememberToday,
+  SentimentAnalysis,
   Snap,
   TrashItem,
   User,
@@ -566,4 +569,47 @@ export const restoreTrashItem = async (type: TrashItem['type'], id: string, user
   if (type === 'snap') return restoreSnap(id, userId)
   if (type === 'mood') return restoreMoodRecord(id, userId)
   return restoreRememberToday(id, userId)
+}
+
+// =========================================================
+// Sentiment analysis services
+// =========================================================
+
+export const getSentimentAnalysisForUser = async (
+  userId: string,
+  limitCount = 200
+): Promise<SentimentAnalysis[]> => {
+  const { data, error } = await supabase
+    .from('sentiment_analysis')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limitCount)
+    .returns<SentimentAnalysisRow[]>()
+
+  if (error) throw error
+  return (data ?? []).map(mapSentimentAnalysisRow)
+}
+
+export const getSentimentAnalysisPreference = async (userId: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('sentiment_analysis_enabled')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data?.sentiment_analysis_enabled ?? true
+}
+
+export const updateSentimentAnalysisPreference = async (
+  userId: string,
+  enabled: boolean
+): Promise<void> => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ sentiment_analysis_enabled: enabled })
+    .eq('id', userId)
+
+  if (error) throw error
 }
