@@ -57,6 +57,12 @@ export interface RememberToday {
 // 결과 설명 텍스트는 DB가 아니라 data/*.json 콘텐츠 파일에서 관리한다.
 export type PersonalityTestType = 'shape' | 'enneagram' | 'life_cycle'
 
+export const TEST_TYPE_LABELS: Record<string, string> = {
+  shape: '도형심리',
+  enneagram: '에니어그램',
+  life_cycle: '생일 인생주기',
+}
+
 export interface PersonalityTestResult {
   id: string
   userId: string
