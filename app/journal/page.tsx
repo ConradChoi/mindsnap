@@ -99,6 +99,18 @@ const SwipeToDeleteCard = ({
     setShowDelete(false)
   }
 
+  // 카드가 스와이프되어 삭제 버튼이 열려있는 상태에서 카드를 탭하면,
+  // 내부 콘텐츠의 onClick(상세 화면 이동 등)이 실행되지 않도록 막고
+  // 카드를 원래 위치로 닫기만 한다.
+  const handleContentClickCapture = (e: React.MouseEvent) => {
+    if (currentX !== 0) {
+      e.preventDefault()
+      e.stopPropagation()
+      setCurrentX(0)
+      setShowDelete(false)
+    }
+  }
+
   return (
     <div className="relative overflow-hidden">
       <div
@@ -107,6 +119,7 @@ const SwipeToDeleteCard = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onClickCapture={handleContentClickCapture}
       >
         {children}
       </div>
@@ -564,6 +577,10 @@ export default function JournalPage() {
       await logTabSwitch(user.uid, activeTab, newTab)
     }
     setActiveTab(newTab)
+    // URL에도 현재 탭을 반영해, 상세 화면에서 router.back()으로 돌아왔을 때
+    // 마운트 시 URL 파라미터를 읽어 올바른 탭을 복원할 수 있도록 한다.
+    // replaceState를 사용해 히스토리 엔트리를 추가로 쌓지 않는다.
+    window.history.replaceState(null, '', `/journal?tab=${newTab}`)
   }
 
   // URL 파라미터에서 탭 정보 가져오기
