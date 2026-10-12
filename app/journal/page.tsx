@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, Plus, Tag, Calendar, Heart, Camera, Brain, Smile, Meh, Frown, Mic, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ListSnapsRes } from '@/contracts/snaps'
 import {
   getMoodRecords,
@@ -19,7 +20,7 @@ import {
 } from '@/lib/supabase-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { logPageView, logTabSwitch } from '@/lib/analytics'
-import { PersonalityTestResult, SentimentAnalysis } from '@/lib/types'
+import { PersonalityTestResult, SentimentAnalysis, TEST_TYPE_LABELS } from '@/lib/types'
 import { useSentimentMap, sentimentKey } from '@/lib/hooks/useSentimentMap'
 import { SentimentBadge } from '@/components/SentimentBadge'
 
@@ -141,6 +142,8 @@ const MoodRecordList = ({
   onDelete: (recordId: string) => void
   sentimentMap: Record<string, SentimentAnalysis>
 }) => {
+  const router = useRouter()
+
   console.log('MoodRecordList props:', { displayedRecords }) // 디버깅용
 
   const filteredRecords = displayedRecords.filter(record => {
@@ -207,7 +210,10 @@ const MoodRecordList = ({
           itemId={record.id}
           onDelete={onDelete}
         >
-          <Card className="hover:shadow-md transition-shadow">
+          <Card
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => router.push(`/journal/mood?id=${record.id}`)}
+          >
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div className="flex-1 space-y-3">
@@ -262,6 +268,8 @@ const RememberTodayList = ({
   onDelete: (recordId: string) => void
   sentimentMap: Record<string, SentimentAnalysis>
 }) => {
+  const router = useRouter()
+
   console.log('RememberTodayList props:', { displayedRecords }) // 디버깅용
 
   const filteredRecords = displayedRecords.filter(record => {
@@ -307,7 +315,10 @@ const RememberTodayList = ({
           itemId={record.id}
           onDelete={onDelete}
         >
-          <Card className="hover:shadow-md transition-shadow">
+          <Card
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => router.push(`/journal/remember?id=${record.id}`)}
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 space-y-3">
@@ -364,6 +375,8 @@ const SnapList = ({
   onDelete: (snapId: string) => void
   sentimentMap: Record<string, SentimentAnalysis>
 }) => {
+  const router = useRouter()
+
   if (filteredSnaps.length === 0) {
     return (
       <div className="text-center py-12 space-y-4">
@@ -398,7 +411,10 @@ const SnapList = ({
           itemId={snap.id}
           onDelete={onDelete}
         >
-          <Card className="hover:shadow-md transition-shadow">
+          <Card
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => router.push(`/journal/snap?id=${snap.id}`)}
+          >
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div className="flex-1 space-y-3">
@@ -455,16 +471,11 @@ const SnapList = ({
   )
 }
 
-const TEST_TYPE_LABELS: Record<string, string> = {
-  shape: '도형심리',
-  enneagram: '에니어그램',
-  life_cycle: '생일 인생주기',
-}
-
 // 성격 목록 컴포넌트 — 제목 조회용 콘텐츠는 DB(personality_test_content)에서 가져온다
 // (Capacitor 앱 패키징 후에도 콘텐츠 문구 수정 시 앱 재빌드 없이 반영되도록 하기 위함)
 const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
   const [titlesByType, setTitlesByType] = useState<Record<string, Record<string, { title: string }>>>({})
+  const router = useRouter()
 
   useEffect(() => {
     const distinctTypes = Array.from(new Set(results.map((r) => r.testType)))
@@ -511,7 +522,11 @@ const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
   return (
     <div className="space-y-3">
       {results.map((result) => (
-        <Card key={result.id}>
+        <Card
+          key={result.id}
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => router.push(`/journal/personality?id=${result.id}`)}
+        >
           <CardContent className="py-4 flex items-center justify-between">
             <div>
               <p className="font-medium text-foreground">{titleFor(result)}</p>
