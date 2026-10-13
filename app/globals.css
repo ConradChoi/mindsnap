@@ -53,6 +53,16 @@
   * {
     @apply border-border;
   }
+  /* html/body 자체는 절대 스크롤되지 않도록 잠근다 — 화면 안의 유일한 스크롤 영역은
+     MobileShell의 <main>(overflow-y-auto)이어야 한다. 이게 없으면 iOS에서 터치 드래그 시
+     <main> 대신 body 전체가 고무줄처럼 바운스 스크롤되면서, <main>에 달린 scroll 리스너
+     (하단 탭바 숨김/노출 트리거)가 전혀 발화하지 않는 문제가 생긴다. */
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-background text-foreground;
   }

@@ -155,18 +155,25 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
     )
   }
 
-  // 로그인 페이지인 경우 네비게이션 없이 렌더링
+  // 로그인 페이지인 경우 네비게이션 없이 렌더링.
+  // body 자체는 전역적으로 스크롤이 잠겨 있으므로(globals.css), 로그인 페이지 내부
+  // (min-h-screen 기반 중앙 정렬 레이아웃)가 작은 화면에서 넘칠 때도 스크롤 가능하도록
+  // 감싸준다.
   if (normalizePath(pathname) === '/login') {
-    return <>{children}</>
+    return <div className="h-dvh overflow-y-auto overscroll-contain">{children}</div>
   }
 
   // 비로그인 상태에서 공개 경로(개인정보처리방침 등)에 접근한 경우:
   // 하단 탭 네비게이션 없이 콘텐츠만 스크롤 가능한 형태로 보여준다.
   // (스토어 심사자/미가입자도 로그인 없이 방침 전문을 볼 수 있어야 한다.)
+  // body 자체는 전역적으로 스크롤이 잠겨 있으므로(globals.css), 아래 메인 셸과 동일하게
+  // h-dvh + overflow-hidden 바깥 컨테이너 안에 overflow-y-auto인 내부 스크롤 영역을 둔다.
   if (!user && isPublicPath(pathname)) {
     return (
-      <div className="min-h-screen bg-background pt-safe-top pb-safe-bottom">
-        <div className="container px-4 py-6">{children}</div>
+      <div className="h-dvh bg-background flex flex-col pt-safe-top overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto container px-4 py-6 pb-safe-bottom">
+          {children}
+        </div>
       </div>
     )
   }
