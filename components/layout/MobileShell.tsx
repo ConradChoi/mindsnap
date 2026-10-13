@@ -197,8 +197,11 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
 
       {/* 메인 콘텐츠 — 이 영역만 스크롤된다.
           하단 탭바가 fixed 오버레이라 그 높이(약 4.5rem)만큼 pb를 더 줘서
-          탭바가 보일 때 마지막 콘텐츠를 가리지 않게 한다. */}
-      <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto container px-4 py-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))]">
+          탭바가 보일 때 마지막 콘텐츠를 가리지 않게 한다. 탭바 자체가 화면 가장자리에서
+          0.75rem 띄워서 떠 있으므로(.bottom-nav-floating), 그 간격도 함께 더해야
+          탭바 바로 아래 틈만큼 콘텐츠가 가려지지 않는다(작은 화면/콘텐츠가 꽉 찬 화면에서
+          마지막 메뉴가 살짝 가려지던 문제 — iPhone 7 홈 화면에서 재현됨). */}
+      <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto container px-4 py-6 pb-[calc(4.5rem+0.75rem+env(safe-area-inset-bottom))]">
         {children}
       </main>
 
