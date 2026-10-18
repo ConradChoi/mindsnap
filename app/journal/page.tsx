@@ -559,6 +559,7 @@ const PersonalityList = ({ results }: { results: PersonalityTestResult[] }) => {
 }
 
 export default function JournalPage() {
+  const router = useRouter()
   const { user } = useAuth()
   const sentimentMap = useSentimentMap(user?.uid)
   const [snaps, setSnaps] = useState<ListSnapsRes['snaps']>([])
@@ -579,8 +580,12 @@ export default function JournalPage() {
     setActiveTab(newTab)
     // URL에도 현재 탭을 반영해, 상세 화면에서 router.back()으로 돌아왔을 때
     // 마운트 시 URL 파라미터를 읽어 올바른 탭을 복원할 수 있도록 한다.
-    // replaceState를 사용해 히스토리 엔트리를 추가로 쌓지 않는다.
-    window.history.replaceState(null, '', `/journal?tab=${newTab}`)
+    // router.replace를 사용한다 — window.history.replaceState를 직접 호출하면
+    // Next.js App Router 자체의 히스토리/캐시 상태와 어긋나서, 이후 상세 화면에서
+    // router.back()이 엉뚱한 곳(예: /journal/insights)으로 가거나 전환 순간 레이아웃이
+    // 일시적으로 잘못 계산되는(화면 잘림) 문제가 있었다. scroll: false로 스크롤 위치는
+    // 유지하고, 탭 전환마다 히스토리 엔트리가 쌓이지 않도록 replace를 쓴다.
+    router.replace(`/journal?tab=${newTab}`, { scroll: false })
   }
 
   // URL 파라미터에서 탭 정보 가져오기
