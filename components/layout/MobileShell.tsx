@@ -143,10 +143,14 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
     }
   }, [pathname, router])
 
-  // 로딩 중일 때는 로딩 화면 표시
+  // 로딩 중일 때는 로딩 화면 표시.
+  // h-dvh를 쓴다 — min-h-screen(raw 100vh)은 저널 페이지의 잘림 버그를 일으켰던 것과
+  // 동일한 패턴이고(h-dvh 기준 높이와 다르게 계산될 수 있음), 이 화면은 h-dvh 바깥
+  // 컨테이너(MobileShell 메인 셸, 공개 경로 분기 등) 없이 단독으로 반환되는 최상위
+  // 요소라 더 취약하다(앱을 켤 때마다/인증 체크마다 보이는 화면이라 노출 빈도도 높음).
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-dvh bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-muted-foreground">Your life is alive</p>
@@ -157,10 +161,15 @@ const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
 
   // 로그인 페이지인 경우 네비게이션 없이 렌더링.
   // body 자체는 전역적으로 스크롤이 잠겨 있으므로(globals.css), 로그인 페이지 내부
-  // (min-h-screen 기반 중앙 정렬 레이아웃)가 작은 화면에서 넘칠 때도 스크롤 가능하도록
-  // 감싸준다.
+  // (min-h-dvh 기반 중앙 정렬 레이아웃)가 작은 화면에서 넘칠 때도 스크롤 가능하도록
+  // 감싸준다. 다른 두 분기(메인 셸, 공개 경로)와 동일하게 bg-background + 상하 안전영역도
+  // 맞춰준다 — 노치 기기에서 하단 버튼/약관 체크박스가 홈 인디케이터와 겹치지 않게 한다.
   if (normalizePath(pathname) === '/login') {
-    return <div className="h-dvh overflow-y-auto overscroll-contain">{children}</div>
+    return (
+      <div className="h-dvh bg-background overflow-y-auto overscroll-contain pt-safe-top pb-safe-bottom">
+        {children}
+      </div>
+    )
   }
 
   // 비로그인 상태에서 공개 경로(개인정보처리방침 등)에 접근한 경우:
