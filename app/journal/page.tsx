@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -571,6 +571,10 @@ export default function JournalPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('snaps')
 
+  // 이 페이지 콘텐츠를 감싸는 컨테이너 — 실제 스크롤은 이 엘리먼트가 아니라
+  // MobileShell의 <main>(overflow-y-auto)에서 일어난다(아래 무한 스크롤 효과 참고).
+  const contentRef = useRef<HTMLDivElement>(null)
+
   // 탭 전환 핸들러 (로깅 포함)
   const handleTabChange = async (newTab: string) => {
     if (newTab !== activeTab && user?.uid) {
@@ -829,21 +833,41 @@ export default function JournalPage() {
     }, 500)
   }
 
-  // 스크롤 이벤트 핸들러
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    const threshold = 100 // 스크롤 끝에서 100px 전에 로드 시작
-    
-    if (scrollHeight - scrollTop - clientHeight < threshold) {
-      if (activeTab === 'snaps' && hasMoreSnaps) {
-        loadMoreSnaps()
-      } else if (activeTab === 'mood' && hasMoreMoodRecords) {
-        loadMoreMoodRecords()
-      } else if (activeTab === 'remember' && hasMoreRememberRecords) {
-        loadMoreRememberRecords()
+  // 무한 스크롤 트리거 — 이 페이지 자체에는 스크롤 가능한 컨테이너를 두지 않는다.
+  // (과거엔 이 div에 `maxHeight: calc(100vh - 200px)` + `overflow-y: auto`를 직접 걸어
+  //  MobileShell의 <main>(이미 overflow-y-auto) 안에 또 다른 스크롤 컨테이너를 중첩시켰다.
+  //  iOS WKWebView에서 `100vh`는 safe-area/contentInset 보정이 들어간 `<main>`의 `h-dvh`
+  //  기준 높이와 다르게 계산될 수 있고, 거기에 실제 헤더/탭/검색창 높이와 무관한 고정값
+  //  "-200px"이 더해져 있어 기기(iPhone 7/SE 등 홈버튼 기기)·배너 표시 상태·탭별 콘텐츠
+  //  길이에 따라 실제 사용 가능한 높이와 어긋났다. 그 결과 저널 페이지에서만(다른 화면엔
+  //  이 패턴이 없다) 화면 상/하단에 WKWebView의 네이티브 배경이 그대로 드러나는 잘림이
+  //  발생했던 것으로 보인다 — 특히 "마음" 탭처럼 목록이 짧아 어긋난 높이가 그대로 빈
+  //  공간으로 드러나는 경우 가장 뚜렷했다.
+  //  이제 실제 스크롤은 MobileShell의 <main>에서만 일어나므로(단일 스크롤 소유자 구조),
+  //  무한 스크롤도 이 div의 가장 가까운 <main> 조상에 리스너를 붙여 그 스크롤을 감시한다.
+  useEffect(() => {
+    const scrollParent = contentRef.current?.closest('main')
+    if (!scrollParent) return
+
+    const handleMainScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollParent
+      const threshold = 100 // 스크롤 끝에서 100px 전에 로드 시작
+
+      if (scrollHeight - scrollTop - clientHeight < threshold) {
+        if (activeTab === 'snaps' && hasMoreSnaps) {
+          loadMoreSnaps()
+        } else if (activeTab === 'mood' && hasMoreMoodRecords) {
+          loadMoreMoodRecords()
+        } else if (activeTab === 'remember' && hasMoreRememberRecords) {
+          loadMoreRememberRecords()
+        }
       }
     }
-  }
+
+    scrollParent.addEventListener('scroll', handleMainScroll, { passive: true })
+    return () => scrollParent.removeEventListener('scroll', handleMainScroll)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, hasMoreSnaps, hasMoreMoodRecords, hasMoreRememberRecords, isLoadingMore])
 
   // 탭 변경 시 초기화 (activeTab만 감지)
   // 탭 변경 시 로그만 출력 (실제 데이터 설정은 삭제 필터링 useEffect에서 처리)
@@ -870,7 +894,7 @@ export default function JournalPage() {
   }
 
      return (
-     <div className="space-y-6" onScroll={handleScroll} style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+     <div ref={contentRef} className="space-y-6">
        {/* 헤더 */}
        <div className="text-center">
          <h1 className="text-2xl font-bold">저널</h1>
