@@ -833,6 +833,20 @@ export default function JournalPage() {
     }, 500)
   }
 
+  // 스크롤 핸들러가 항상 최신 상태를 보도록 ref에 매 렌더마다 최신값을 담아둔다.
+  // (QA 리뷰로 발견된 stale closure 버그 수정: 이전엔 리스너를 effect deps가 바뀔 때만
+  //  재등록했는데, hasMoreSnaps 등이 로딩 중 true→true로 "같은 값"으로 다시 set되면
+  //  effect가 재실행되지 않아 리스너가 마운트 시점의 오래된 loadMoreSnaps 클로저에
+  //  영원히 묶였다 — 정확히 31번째 항목부터 무한 스크롤이 조용히 멈추는 회귀였다.)
+  const activeTabRef = useRef(activeTab)
+  activeTabRef.current = activeTab
+  const loadMoreSnapsRef = useRef(loadMoreSnaps)
+  loadMoreSnapsRef.current = loadMoreSnaps
+  const loadMoreMoodRecordsRef = useRef(loadMoreMoodRecords)
+  loadMoreMoodRecordsRef.current = loadMoreMoodRecords
+  const loadMoreRememberRecordsRef = useRef(loadMoreRememberRecords)
+  loadMoreRememberRecordsRef.current = loadMoreRememberRecords
+
   // 무한 스크롤 트리거 — 이 페이지 자체에는 스크롤 가능한 컨테이너를 두지 않는다.
   // (과거엔 이 div에 `maxHeight: calc(100vh - 200px)` + `overflow-y: auto`를 직접 걸어
   //  MobileShell의 <main>(이미 overflow-y-auto) 안에 또 다른 스크롤 컨테이너를 중첩시켰다.
@@ -845,6 +859,9 @@ export default function JournalPage() {
   //  공간으로 드러나는 경우 가장 뚜렷했다.
   //  이제 실제 스크롤은 MobileShell의 <main>에서만 일어나므로(단일 스크롤 소유자 구조),
   //  무한 스크롤도 이 div의 가장 가까운 <main> 조상에 리스너를 붙여 그 스크롤을 감시한다.
+  //  isLoading을 deps에 둬서, 로딩 스피너만 그려지는 첫 렌더(이때 contentRef는 아직
+  //  DOM에 없다)에선 리스너를 못 붙이더라도, 로딩이 끝나 실제 콘텐츠 div가 마운트되는
+  //  순간 effect가 한 번 더 실행되어 그때 확실히 리스너를 붙인다.
   useEffect(() => {
     const scrollParent = contentRef.current?.closest('main')
     if (!scrollParent) return
@@ -854,20 +871,20 @@ export default function JournalPage() {
       const threshold = 100 // 스크롤 끝에서 100px 전에 로드 시작
 
       if (scrollHeight - scrollTop - clientHeight < threshold) {
-        if (activeTab === 'snaps' && hasMoreSnaps) {
-          loadMoreSnaps()
-        } else if (activeTab === 'mood' && hasMoreMoodRecords) {
-          loadMoreMoodRecords()
-        } else if (activeTab === 'remember' && hasMoreRememberRecords) {
-          loadMoreRememberRecords()
+        const tab = activeTabRef.current
+        if (tab === 'snaps') {
+          loadMoreSnapsRef.current()
+        } else if (tab === 'mood') {
+          loadMoreMoodRecordsRef.current()
+        } else if (tab === 'remember') {
+          loadMoreRememberRecordsRef.current()
         }
       }
     }
 
     scrollParent.addEventListener('scroll', handleMainScroll, { passive: true })
     return () => scrollParent.removeEventListener('scroll', handleMainScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, hasMoreSnaps, hasMoreMoodRecords, hasMoreRememberRecords, isLoadingMore])
+  }, [isLoading])
 
   // 탭 변경 시 초기화 (activeTab만 감지)
   // 탭 변경 시 로그만 출력 (실제 데이터 설정은 삭제 필터링 useEffect에서 처리)
